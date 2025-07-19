@@ -1,0 +1,37 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Sat Jul 19 00:40:30 2025
+[*]
+[dumpfile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/sim_build/sdram_controller.fst"
+[dumpfile_mtime] "Sat Jul 19 00:39:19 2025"
+[dumpfile_size] 1254
+[savefile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/wave.gtkw"
+[timestart] 0
+[size] 3370 1243
+[pos] -51 -51
+*-26.000000 11400000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 233
+[signals_width] 368
+[sst_expanded] 1
+[sst_vpaned_height] 368
+@28
+sdram_controller.clk
+sdram_controller.rst_n
+@200
+-
+-SDRAM IO
+@22
+sdram_controller.sdram_addr[11:0]
+@28
+sdram_controller.sdram_ba[1:0]
+sdram_controller.sdram_cas_n
+sdram_controller.sdram_cke
+sdram_controller.sdram_cs_n
+@22
+sdram_controller.sdram_dq[15:0]
+sdram_controller.sdram_dqo[15:0]
+@28
+sdram_controller.sdram_ras_n
+sdram_controller.sdram_we_n
+[pattern_trace] 1
+[pattern_trace] 0
