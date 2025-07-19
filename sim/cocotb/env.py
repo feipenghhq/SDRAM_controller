@@ -15,10 +15,10 @@ from cocotb.triggers import FallingEdge, RisingEdge, Timer
 from cocotb.clock import Clock
 
 def load_mode_reg(dut, burst_len=0, burst_type=0, cas=2, write_burst_mode=0):
-    dut.cfg_burst_length.value     = burst_len
-    dut.cfg_burst_type.value       = burst_type
-    dut.cfg_cas_latency.value      = cas
-    dut.cfg_write_burst_mode.value = write_burst_mode
+    dut.cfg_burst_length.value  = burst_len
+    dut.cfg_burst_type.value    = burst_type
+    dut.cfg_cas_latency.value   = cas
+    dut.cfg_burst_mode.value    = write_burst_mode
 
 async def init(dut, period = 10):
     """

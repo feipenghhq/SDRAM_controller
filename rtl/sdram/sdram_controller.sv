@@ -30,8 +30,8 @@ module sdram_controller #(
     parameter tRRD = 20,        // (ns) ACTIVE bank a to ACTIVE bank b command
     parameter cMRD = 3,         // (cycle) LOAD MODE REGISTER command to ACTIVE or REFRESH command
     // TBD, FIXME
-    parameter tDPL = 20,        // (ns) Data into precharge
-    parameter tSRX = 10,        // (ns) Self refresh exit time
+    //parameter tDPL = 20,        // (ns) Data into precharge
+    //parameter tSRX = 10,        // (ns) Self refresh exit time
 
     // sdram initialization sequence
     parameter INIT_TIME = 200   // (us) initialization NOP time
@@ -53,7 +53,7 @@ module sdram_controller #(
     input  logic [2:0]      cfg_burst_length,       // SDRAM Mode register: Burst Length
     input  logic            cfg_burst_type,         // SDRAM Mode register: Burst Type
     input  logic [2:0]      cfg_cas_latency,        // SDRAM Mode register: CAS Latency
-    input  logic            cfg_write_burst_mode,   // SDRAM Mode register: Write Burst Mode
+    input  logic            cfg_burst_mode,         // SDRAM Mode register: Write Burst Mode
 
     // SDRAM interface
     output logic            sdram_cke,              // Clock Enable. CKE is high active.
@@ -368,7 +368,7 @@ always_comb begin
                         int_addr[3]   = cfg_burst_type;
                         int_addr[6:4] = cfg_cas_latency;
                         int_addr[8:7] = 2'b0;
-                        int_addr[9]   = cfg_write_burst_mode;
+                        int_addr[9]   = cfg_burst_mode;
                         int_addr[RAW-1:10] = 'b0;
                     end
                 end
