@@ -118,8 +118,12 @@ localparam cR2P = `ceil_div((tRAS-tRCD) * CLK_FREQ, 1000);  // (CLK_CYCLE) READ-
 localparam INIT_NOP_CYCLE = 200 * CLK_FREQ;
 localparam INIT_CNT_WIDTH = $clog2(INIT_NOP_CYCLE);
 
+// Refresh counter threshold
+localparam REFRESH_INTERVAL = (tREF * 1000 * CLK_FREQ / (2**RAW));
+
 // Command counter width
 localparam CMD_CNT_WIDTH = $clog2(cRC); // Row cycle time take the most count
+
 
 /////////////////////////////////////////////////
 // State Machine Declaration
@@ -136,7 +140,8 @@ typedef enum logic [3:0] {
     WRITE_A,            // Write with auto precharge
     READ,               // Read without auto precharge
     READ_A,             // Read with auto precharge
-    PRECHARGE           // Precharge the bank
+    PRECHARGE,          // Precharge the bank
+    AUTO_REFRESH        // Auto Refresh
 } sdram_main_state_t;
 
 // SDRAM Initialization State Machine
@@ -167,15 +172,19 @@ logic                       s_is_write_a;
 logic                       s_is_read;
 logic                       s_is_read_a;
 logic                       s_is_precharge;
+logic                       s_is_auto_refresh;
 
 logic                       arc_reset_2_init;
 logic                       arc_init_2_idle;
 logic                       arc_idle_2_row_active;
+logic                       arc_idle_2_auto_refresh;
 logic                       arc_row_active_2_write_a;
 logic                       arc_row_active_2_read_a;
 logic                       arc_write_a_2_precharge;
 logic                       arc_read_a_2_precharge;
 logic                       arc_precharge_2_idle;
+logic                       arc_auto_refresh_2_idle;
+logic                       arc_auto_refresh_2_row_active;
 
 // init state machine
 sdram_init_state_t          init_state, init_state_n;
@@ -305,6 +314,7 @@ assign s_is_write_a      = (main_state == WRITE_A);
 assign s_is_read         = (main_state == READ);
 assign s_is_read_a       = (main_state == READ_A);
 assign s_is_precharge    = (main_state == PRECHARGE);
+assign s_is_auto_refresh = (main_state == AUTO_REFRESH);
 
 // state transaction arc
 
@@ -314,6 +324,8 @@ assign arc_reset_2_init = s_is_reset;
 assign arc_init_2_idle = s_is_init & (init_state == INIT_DONE);
 // IDLE -> ROW_ACTIVE: Get a new Bus request
 assign arc_idle_2_row_active = s_is_idle & (int_bus_read | int_bus_write);
+// IDLE -> AUTO_REFRESH
+assign arc_idle_2_auto_refresh = s_is_idle & ir_cnt_zero;
 // ROW ACTIVE -> WRITE_A
 assign arc_row_active_2_write_a = s_is_row_active & cmd_cpl & int_bus_write;
 // ROW ACTIVE -> READ_A
@@ -324,6 +336,10 @@ assign arc_write_a_2_precharge = s_is_write_a & cmd_cpl;
 assign arc_read_a_2_precharge = s_is_read_a & cmd_cpl;
 // PRECHARGE -> IDLE: Complete the precharge operation
 assign arc_precharge_2_idle = s_is_precharge & cmd_cpl;
+// AUTO_REFRESH -> IDLE: Complete the auto refresh operation and no request pending
+assign arc_auto_refresh_2_idle = s_is_auto_refresh & cmd_cpl & ~(int_bus_write | int_bus_read);
+// AUTO_REFRESH -> IDLE: Complete the auto refresh operation but request pending
+assign arc_auto_refresh_2_row_active = s_is_auto_refresh & cmd_cpl & (int_bus_write | int_bus_read);
 
 // state transition
 always_ff @(posedge clk) begin
@@ -337,15 +353,18 @@ end
 
 always_comb begin
     case(1)
-        arc_reset_2_init:           main_state_n = INIT;
-        arc_init_2_idle:            main_state_n = IDLE;
-        arc_idle_2_row_active:      main_state_n = ROW_ACTIVE;
-        arc_row_active_2_write_a:   main_state_n = WRITE_A;
-        arc_row_active_2_read_a:    main_state_n = READ_A;
-        arc_write_a_2_precharge:    main_state_n = PRECHARGE;
-        arc_read_a_2_precharge:     main_state_n = PRECHARGE;
-        arc_precharge_2_idle:       main_state_n = IDLE;
-        default:                    main_state_n = main_state;
+        arc_reset_2_init:               main_state_n = INIT;
+        arc_init_2_idle:                main_state_n = IDLE;
+        arc_idle_2_row_active:          main_state_n = ROW_ACTIVE;
+        arc_idle_2_auto_refresh:        main_state_n = AUTO_REFRESH;
+        arc_row_active_2_write_a:       main_state_n = WRITE_A;
+        arc_row_active_2_read_a:        main_state_n = READ_A;
+        arc_write_a_2_precharge:        main_state_n = PRECHARGE;
+        arc_read_a_2_precharge:         main_state_n = PRECHARGE;
+        arc_precharge_2_idle:           main_state_n = IDLE;
+        arc_auto_refresh_2_idle:        main_state_n = IDLE;
+        arc_auto_refresh_2_row_active:  main_state_n = ROW_ACTIVE;
+        default:                        main_state_n = main_state;
     endcase
 end
 
@@ -401,6 +420,7 @@ always_ff @(posedge clk) begin
     end
     else begin
         if (arc_reset_2_init)  ir_cnt <= INIT_NOP_CYCLE;
+        else if (arc_init_2_idle || arc_idle_2_auto_refresh) ir_cnt <= REFRESH_INTERVAL;
         else if (ir_cnt > 0)   ir_cnt <= ir_cnt - 1'b1;
     end
 end
@@ -556,13 +576,14 @@ always_comb begin
             // 2. Set int_bus_ready = 0 when we get taking a new request in IDLE state
             // OPT: This can be further optimized, we can register the bus request at PRECHARGE stage
             //      and go ROW_ACTIVE stage directly after completing PRECHARGE
-            if (arc_precharge_2_idle) int_bus_ready = 1'b1;
-            else                      int_bus_ready = ~(bus_read | bus_write);
+            if (arc_precharge_2_idle || arc_auto_refresh_2_idle) int_bus_ready = 1'b1;
+            //if (main_state != IDLE) int_bus_ready = 1'b1;
+            else                    int_bus_ready = ~(bus_read | bus_write);
         end
 
         // ROW_ACTIVE state
         ROW_ACTIVE: begin
-            if (arc_idle_2_row_active) begin    // active a row
+            if (main_state != ROW_ACTIVE) begin    // active a row
                 `cmd(CMD_ACTIVE);
                 cmd_is_active = 1'b1;
                 int_sdram_ba = bank;
@@ -599,6 +620,14 @@ always_comb begin
                 `cmd(CMD_PRECHARGE);
                 cmd_is_precharge = 1'b1;
                 int_sdram_addr[10] = 1'b1;    // precharge all bank.
+            end
+        end
+
+        // AUTO_REFRESH
+        AUTO_REFRESH: begin
+            if (arc_idle_2_auto_refresh) begin
+                `cmd(CMD_REFRESH);      // auto-refresh (cke=1)
+                cmd_is_refresh = 1'b1;
             end
         end
     endcase
@@ -654,6 +683,7 @@ always_comb begin
         READ:         main_state_str = "READ      ";
         READ_A:       main_state_str = "READ_A    ";
         PRECHARGE:    main_state_str = "PRECHARGE ";
+        AUTO_REFRESH: main_state_str = "AUTO_REFRESH";
         default:      main_state_str = "UNKNOWN   ";
     endcase
 end

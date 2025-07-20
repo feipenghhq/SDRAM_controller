@@ -1,21 +1,21 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sun Jul 20 03:49:40 2025
+[*] Sun Jul 20 07:15:13 2025
 [*]
 [dumpfile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/sim_build/tb_top.fst"
-[dumpfile_mtime] "Sun Jul 20 03:48:29 2025"
-[dumpfile_size] 90954
+[dumpfile_mtime] "Sun Jul 20 07:12:08 2025"
+[dumpfile_size] 95856
 [savefile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/wave.gtkw"
-[timestart] 201085800
-[size] 1685 1243
-[pos] -1 -1
-*-15.000000 201160000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[timestart] 201980000
+[size] 3370 1243
+[pos] -51 -51
+*-16.000000 202340000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb_top.
 [treeopen] tb_top.dut.
 [sst_width] 315
 [signals_width] 420
 [sst_expanded] 1
-[sst_vpaned_height] 368
+[sst_vpaned_height] 776
 @28
 tb_top.rst_n
 tb_top.clk
@@ -25,6 +25,8 @@ tb_top.clk
 @28
 tb_top.dut.bus_read
 tb_top.dut.bus_write
+@29
+tb_top.dut.u_sdram_controller.bus_ready
 @22
 tb_top.dut.bus_addr[23:0]
 @28

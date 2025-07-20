@@ -88,7 +88,7 @@ async def bus_read(
     dut.bus_addr.value       = 0
     dut.bus_byteenable.value = 0
 
-async def bus_read_response(dut, expected=None):
+async def bus_read_response(dut, expected=None, debug=False):
     """
     Monitor the bus and receive read data
 
@@ -96,12 +96,18 @@ async def bus_read_response(dut, expected=None):
     - dut: The DUT handle
     - expected: List of expected data
     """
+    i = 0
     if expected:
         for exp_data in expected:
             await RisingEdge(dut.bus_rvalid)
             await FallingEdge(dut.clk)
             data = dut.bus_rdata.value.integer
             assert data == exp_data, dut._log.error(f"[BUS READ] Wrong read data. Expected: {exp_data}. Actual: {data}")
+            i += 1
+            if debug:
+                dut._log.info(f"[BUS READ] Read data count: {i}")
+        dut._log.info(f"[BUS READ] Read all expected data!!!")
+        return
     else:
         await RisingEdge(dut.bus_rvalid)
         await FallingEdge(dut.clk)
