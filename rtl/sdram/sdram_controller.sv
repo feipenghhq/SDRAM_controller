@@ -8,29 +8,38 @@
 //
 // -------------------------------------------------------------------
 // SDRAM Controller
+//
+// Supported SDRAM Features:
+//     1. Single Read/Write access with Auto-precharge
+//
+// Other Features:
+//     1. system bus input are registered for better timing
+//     2. system bus output are registered for better timing
 // -------------------------------------------------------------------
+
+
 
 module sdram_controller #(
     // global parameter
-    parameter AW = 16,          // AHB Bus Address width. Should match with SDRAM  data width
-    parameter DW = 16,          // AHB Bus Data width
+    parameter AW = 24,          // Bus Address width. Should match with SDRAM size
+    parameter DW = 16,          // Bus Data width
     parameter CLK_FREQ = 100,   // (MHz) clock frequency
 
     // sdram parameter
     parameter RAW = 12,         // Row address width
-    parameter CAW = 8,          // Column address width
+    parameter CAW = 9,          // Column address width
 
     // sdram timing parameter
-    parameter tRAS = 50,        // (ns) ACTIVE-to-PRECHARGE command
-    parameter tRC  = 80,        // (ns) ACTIVE-to-ACTIVE command period
-    parameter tRCD = 20,        // (ns) ACTIVE-to-READ or WRITE delay
+    parameter tRAS = 42,        // (ns) ACTIVE-to-PRECHARGE command
+    parameter tRC  = 60,        // (ns) ACTIVE-to-ACTIVE command period
+    parameter tRCD = 18,        // (ns) ACTIVE-to-READ or WRITE delay
     parameter tREF = 64,        // (ms) Refresh Period
     parameter tRFC = 60,        // (ns) AUTO REFRESH period
-    parameter tRP  = 20,        // (ns) PRECHARGE command period
+    parameter tRP  = 18,        // (ns) PRECHARGE command period
     parameter tRRD = 20,        // (ns) ACTIVE bank a to ACTIVE bank b command
+    parameter tWR  = 20,        // (ns) WRITE recovery time (WRITE completion to PRECHARGE period)
     parameter cMRD = 3,         // (cycle) LOAD MODE REGISTER command to ACTIVE or REFRESH command
     // TBD, FIXME
-    //parameter tDPL = 20,        // (ns) Data into precharge
     //parameter tSRX = 10,        // (ns) Self refresh exit time
 
     // sdram initialization sequence
@@ -39,15 +48,17 @@ module sdram_controller #(
     input  logic            clk,
     input  logic            rst_n,
 
-    // AHB-Lite Bus
-    input  logic [AW-1:0]   haddr,
-    input  logic [2:0]      hburst,
-    input  logic            hmasterlock,
-    input  logic [3:0]      hprot,
-    input  logic [2:0]      hsize,
-    input  logic [1:0]      htrans,
-    input  logic [DW-1:0]   hwdata,
-    input  logic            hwrite,
+    // System Bus
+    input  logic            bus_read,               // read request
+    input  logic            bus_write,              // write request
+    input  logic [AW-1:0]   bus_addr,               // address
+    input  logic            bus_burst,              // indicate burst transfer
+    input  logic [2:0]      bus_burst_len,          // Burst length
+    input  logic [DW-1:0]   bus_wdata,              // write data
+    input  logic [DW/8-1:0] bus_byteenable,         // byte enable
+    output logic            bus_ready,              // ready
+    output logic            bus_rvalid,             // read data valid
+    output logic [DW-1:0]   bus_rdata,              // read data
 
     // SDRAM Config
     input  logic [2:0]      cfg_burst_length,       // SDRAM Mode register: Burst Length
@@ -69,10 +80,15 @@ module sdram_controller #(
 );
 
 /////////////////////////////////////////////////
-// Local Parameter
+// Local Parameter and macro
 /////////////////////////////////////////////////
 
+// Bus Decode
+localparam NUM_BYTE      = DW / 8;                      // Number of byte
+localparam BW            = $clog2(NUM_BYTE);            // Address With to select the byte
+
 // SDRAM Command
+// {cs_n, ras_n, cas_n, we_m} = CMD
 localparam CMD_DESL      = 4'b1111;                     // COMMAND INHIBIT, Device de-select
 localparam CMD_NOP       = 4'b0111;                     // NO OPERATION
 localparam CMD_ACTIVE    = 4'b0011;                     // BANK ACTIVE
@@ -84,7 +100,9 @@ localparam CMD_REFRESH   = 4'b0001;                     // AUTO REFRESH or SELF 
 localparam CMD_LMR       = 4'b0000;                     // LOAD MODE REGISTER
 
 // roundup division
-`define ceil_div(a, b)  (a + b - 1) / b
+`define ceil_div(a, b)  ((a + b - 1) / b)
+// max
+`define max(a, b)       ((a > b) ? a : b)
 
 // Calculate the SDRAM timing in terms of number of clock cycle
 localparam cRAS = `ceil_div(tRAS * CLK_FREQ, 1000);     // (CLK Cycle) ACTIVE-to-PRECHARGE command
@@ -93,6 +111,8 @@ localparam cRCD = `ceil_div(tRCD * CLK_FREQ, 1000);     // (CLK Cycle) ACTIVE-to
 localparam cRFC = `ceil_div(tRFC * CLK_FREQ, 1000);     // (CLK Cycle) AUTO REFRESH period
 localparam cRP  = `ceil_div(tRP  * CLK_FREQ, 1000);     // (CLK Cycle) PRECHARGE command period
 localparam cRRD = `ceil_div(tRRD * CLK_FREQ, 1000);     // (CLK Cycle) ACTIVE bank a to ACTIVE bank b command
+localparam cWR  = `ceil_div(tWR  * CLK_FREQ, 1000);     // (CLK Cycle) WRITE recovery time (WRITE completion to PRECHARGE period)
+localparam cR2P = `ceil_div((tRAS-tRCD) * CLK_FREQ, 1000);  // (CLK_CYCLE) READ-to-PRECHARGE Command
 
 // Initialization cycle and counter width
 localparam INIT_NOP_CYCLE = 200 * CLK_FREQ;
@@ -134,81 +154,176 @@ typedef enum logic [3:0] {
 // Signal Declaration
 /////////////////////////////////////////////////
 
-// ----------------------------------------------
-// main state
-// ----------------------------------------------
-
+// main state machine
 sdram_main_state_t          main_state, main_state_n;
 
-logic                       main_state_is_reset;
-logic                       main_state_is_init;
-logic                       main_state_is_mode_reg_set;
-logic                       main_state_is_idle;
-logic                       main_state_is_row_active;
-logic                       main_state_is_write;
-logic                       main_state_is_write_a;
-logic                       main_state_is_read;
-logic                       main_state_is_read_a;
-logic                       main_state_is_precharge;
+logic                       s_is_reset;
+logic                       s_is_init;
+logic                       s_is_mode_reg_set;
+logic                       s_is_idle;
+logic                       s_is_row_active;
+logic                       s_is_write;
+logic                       s_is_write_a;
+logic                       s_is_read;
+logic                       s_is_read_a;
+logic                       s_is_precharge;
 
-logic                       arc_main_reset_2_init;
+logic                       arc_reset_2_init;
+logic                       arc_init_2_idle;
+logic                       arc_idle_2_row_active;
+logic                       arc_row_active_2_write_a;
+logic                       arc_row_active_2_read_a;
+logic                       arc_write_a_2_precharge;
+logic                       arc_read_a_2_precharge;
+logic                       arc_precharge_2_idle;
 
-// ----------------------------------------------
-// init state
-// ----------------------------------------------
+// init state machine
 sdram_init_state_t          init_state, init_state_n;
 
+// registered system bus (can be registered or not depending on the parameter)
+logic                       bus_read_q;
+logic                       bus_write_q;
+logic [AW-1:0]              bus_addr_q;
 
-// ----------------------------------------------
+// Internal system bus, these are registered version of the system bus
+logic                       int_bus_read;
+logic                       int_bus_write;
+logic [AW-1:0]              int_bus_addr;
+logic                       int_bus_burst;
+logic [2:0]                 int_bus_burst_len;
+logic [DW-1:0]              int_bus_wdata;
+logic [DW/8-1:0]            int_bus_byteenable;
+logic                       int_bus_ready;
+logic                       int_bus_rvalid;
+logic [DW-1:0]              int_bus_rdata;
+
+logic                       bus_req;            // bus request pending
+logic                       bus_req_cpl;            // bus request completion
+
+// Address mapping
+logic [1:0]                 bank;               // band address
+logic [RAW-1:0]             row;                // row address
+logic [CAW-1:0]             col;                // column address
+
 // Internal sdram control signal
-// ----------------------------------------------
-logic                       int_cke;
-logic                       int_cs_n;
-logic                       int_ras_n;
-logic                       int_cas_n;
-logic                       int_we_n;
-logic [RAW-1:0]             int_addr;
-logic [1:0]                 int_ba;
-logic [DW/8-1:0]            int_dqm;
-logic [DW-1:0]              int_dqo;
-logic [DW-1:0]              sdram_dqo;          // registered version of int_dqp
+logic                       int_sdram_cke;
+logic                       int_sdram_cs_n;
+logic                       int_sdram_ras_n;
+logic                       int_sdram_cas_n;
+logic                       int_sdram_we_n;
+logic [RAW-1:0]             int_sdram_addr;
+logic [1:0]                 int_sdram_ba;
+logic [DW/8-1:0]            int_sdram_dqm;
+logic [DW-1:0]              int_sdram_dqo;
+logic [DW-1:0]              sdram_dqo;          // registered version of int_sdram_dqp
 
 // initialization/refresh counter
 logic [INIT_CNT_WIDTH-1:0]  ir_cnt;
 logic                       ir_cnt_zero;        // counter reach zero
 
 // command period counter and state indicator
-// a command is followed by the command itself and several NOP cmd for the wait state
 logic [CMD_CNT_WIDTH-1:0]   cmd_cnt;
 logic                       cmd_cpl;            // indicate that a cmd has been complete
 logic                       cmd_is_precharge;
 logic                       cmd_is_lmr;         // load mode register
 logic                       cmd_is_refresh;
+logic                       cmd_is_active;
+logic                       cmd_is_write;
+logic                       cmd_is_read;
+logic [CMD_CNT_WIDTH-1:0]   read_to_precharge_cyc;  // read to precharge cycle
+
+// CL counter to indicate read data ready
+logic [1:0]                 cas_cnt;
+logic                       wait_rdata;         // read request issue, waiting for read data
 
 /////////////////////////////////////////////////
 // Main logic
 /////////////////////////////////////////////////
 
 // ----------------------------------------------
+// Handling system bus
+// ----------------------------------------------
+
+assign bus_req = (bus_read | bus_write) & bus_ready;
+
+// Register Input
+always_ff @(posedge clk) begin
+    if (!rst_n) begin
+        int_bus_read   <= 1'b0;
+        int_bus_write  <= 1'b0;
+    end
+    else begin
+        if (bus_req) begin
+            int_bus_read   <= bus_read;
+            int_bus_write  <= bus_write;
+        end
+        else if (bus_req_cpl) begin
+            int_bus_read   <= 1'b0;
+            int_bus_write  <= 1'b0;
+        end
+    end
+end
+
+always_ff @(posedge clk) begin
+    if (bus_req) begin
+        int_bus_addr       <= bus_addr;
+        int_bus_burst      <= bus_burst;
+        int_bus_burst_len  <= bus_burst_len;
+        int_bus_wdata      <= bus_wdata;
+        int_bus_byteenable <= bus_byteenable;
+    end
+end
+
+// Register Bus Output
+always_ff @(posedge clk) begin
+    if (!rst_n) begin
+        bus_ready  <= 1'b0;
+        bus_rvalid <= 1'b0;
+    end
+    else begin
+        bus_ready  <= int_bus_ready;
+        bus_rvalid <= int_bus_rvalid;
+    end
+end
+
+always_ff @(posedge clk) begin
+   bus_rdata <= int_bus_rdata;
+end
+
+// ----------------------------------------------
 // Main state machine
 // ----------------------------------------------
 
 // state assignment
-assign main_state_is_reset        = (main_state == RESET);
-assign main_state_is_init         = (main_state == INIT);
-assign main_state_is_mode_reg_set = (main_state == MODE_REG_SET);
-assign main_state_is_idle         = (main_state == IDLE);
-assign main_state_is_row_active   = (main_state == ROW_ACTIVE);
-assign main_state_is_write        = (main_state == WRITE);
-assign main_state_is_write_a      = (main_state == WRITE_A);
-assign main_state_is_read         = (main_state == READ);
-assign main_state_is_read_a       = (main_state == READ_A);
-assign main_state_is_precharge    = (main_state == PRECHARGE);
+assign s_is_reset        = (main_state == RESET);
+assign s_is_init         = (main_state == INIT);
+assign s_is_mode_reg_set = (main_state == MODE_REG_SET);
+assign s_is_idle         = (main_state == IDLE);
+assign s_is_row_active   = (main_state == ROW_ACTIVE);
+assign s_is_write        = (main_state == WRITE);
+assign s_is_write_a      = (main_state == WRITE_A);
+assign s_is_read         = (main_state == READ);
+assign s_is_read_a       = (main_state == READ_A);
+assign s_is_precharge    = (main_state == PRECHARGE);
 
 // state transaction arc
 
-// Start SDRAM initialization sequence once coming out of reset
-assign arc_main_reset_2_init = main_state_is_reset;
+// RESET -> INIT: Start SDRAM initialization sequence once coming out of reset
+assign arc_reset_2_init = s_is_reset;
+// INIT -> IDLE: Initialization complete
+assign arc_init_2_idle = s_is_init & (init_state == INIT_DONE);
+// IDLE -> ROW_ACTIVE: Get a new Bus request
+assign arc_idle_2_row_active = s_is_idle & (int_bus_read | int_bus_write);
+// ROW ACTIVE -> WRITE_A
+assign arc_row_active_2_write_a = s_is_row_active & cmd_cpl & int_bus_write;
+// ROW ACTIVE -> READ_A
+assign arc_row_active_2_read_a = s_is_row_active & cmd_cpl & int_bus_read;
+// WRITE_A -> PRECHARGE: Complete write operation and wait tWR
+assign arc_write_a_2_precharge = s_is_write_a & cmd_cpl;
+// READ_A -> PRECHARGE: Complete read operation and wait time (read_to_precharge_cyc)
+assign arc_read_a_2_precharge = s_is_read_a & cmd_cpl;
+// PRECHARGE -> IDLE: Complete the precharge operation
+assign arc_precharge_2_idle = s_is_precharge & cmd_cpl;
 
 // state transition
 always_ff @(posedge clk) begin
@@ -222,8 +337,15 @@ end
 
 always_comb begin
     case(1)
-        arc_main_reset_2_init: main_state_n = INIT;
-        default: main_state_n = main_state;
+        arc_reset_2_init:           main_state_n = INIT;
+        arc_init_2_idle:            main_state_n = IDLE;
+        arc_idle_2_row_active:      main_state_n = ROW_ACTIVE;
+        arc_row_active_2_write_a:   main_state_n = WRITE_A;
+        arc_row_active_2_read_a:    main_state_n = READ_A;
+        arc_write_a_2_precharge:    main_state_n = PRECHARGE;
+        arc_read_a_2_precharge:     main_state_n = PRECHARGE;
+        arc_precharge_2_idle:       main_state_n = IDLE;
+        default:                    main_state_n = main_state;
     endcase
 end
 
@@ -245,7 +367,7 @@ always_comb begin
     init_state_n = init_state;
     case(init_state)
         INIT_IDLE: begin
-            if (arc_main_reset_2_init) init_state_n = INIT_WAIT;
+            if (arc_reset_2_init) init_state_n = INIT_WAIT;
         end
         INIT_WAIT: begin
             if (ir_cnt_zero) init_state_n = INIT_PRECHARGE;
@@ -278,8 +400,8 @@ always_ff @(posedge clk) begin
         ir_cnt <= 'b0;
     end
     else begin
-        if (arc_main_reset_2_init)  ir_cnt <= INIT_NOP_CYCLE;
-        else if (ir_cnt > 0)        ir_cnt <= ir_cnt - 1'b1;
+        if (arc_reset_2_init)  ir_cnt <= INIT_NOP_CYCLE;
+        else if (ir_cnt > 0)   ir_cnt <= ir_cnt - 1'b1;
     end
 end
 
@@ -299,6 +421,9 @@ always_ff @(posedge clk) begin
             cmd_is_precharge: cmd_cnt <= cRP [CMD_CNT_WIDTH-1:0];
             cmd_is_refresh:   cmd_cnt <= cRFC[CMD_CNT_WIDTH-1:0];
             cmd_is_lmr:       cmd_cnt <= cMRD[CMD_CNT_WIDTH-1:0];
+            cmd_is_active:    cmd_cnt <= cRCD[CMD_CNT_WIDTH-1:0];
+            cmd_is_write:     cmd_cnt <= cWR [CMD_CNT_WIDTH-1:0];
+            cmd_is_read:      cmd_cnt <= read_to_precharge_cyc;
             default: if (cmd_cnt > 0) cmd_cnt <= cmd_cnt - 1'b1;
         endcase
     end
@@ -306,34 +431,77 @@ end
 
 assign cmd_cpl = cmd_cnt == 0;
 
+// Note for READ with Auto Precharge:
+// From SPEC: If auto precharge is enabled, the row being accessed is pre-charged at the completion of the burst.
+// This means that if read burst complete (last data present) at T, then precharge command should be issued at T-tRP.
+// For a Single READ with Auto Precharge operation, Precharge should be issue after meeting tRAS requirement.
+// For now, since we only support a single read, we should goto PRECHARGE state when meeting the above 2 requirement.
+// which is the maximum of CAS latency and tRAS - tRCD
+assign read_to_precharge_cyc = `max(cfg_cas_latency, cR2P[CMD_CNT_WIDTH-1:0]);
+
 // ----------------------------------------------
-// SDRAM Output Logic
+// CAS Latency counter
+// ----------------------------------------------
+// Check when read data is available
+always_ff @(posedge clk) begin
+    if (!rst_n) begin
+        cas_cnt <= 'b0;
+        wait_rdata <= 1'b0;
+    end
+    else begin
+        if (cmd_is_read) begin
+            cas_cnt <= cfg_cas_latency[1:0];
+            wait_rdata <= 1'b1;
+        end
+        else if (cas_cnt != 0) begin
+            cas_cnt <= cas_cnt - 1'b1;
+        end
+        else if (cas_cnt == 0) begin
+            wait_rdata <= 1'b0;
+        end
+    end
+end
+
+// ----------------------------------------------
+// SDRAM State Machine Output Function Logic
 // ----------------------------------------------
 
-// assign the control signal given a operation
-`define cmd(op) {int_cs_n, int_ras_n, int_cas_n, int_we_n} = op
+// Decode the bus address to sdram bank, row, col
+assign {bank, row, col} = int_bus_addr[AW-1:BW];
+
+assign int_bus_rvalid  = wait_rdata & (cas_cnt == 0);
+assign int_bus_rdata   = sdram_dq;
+
+// Micro to assign the control signal given a operation
+`define cmd(op) {int_sdram_cs_n, int_sdram_ras_n, int_sdram_cas_n, int_sdram_we_n} = op
 
 always_comb begin
 
-    int_cke   = 'b1;    // default CLK = high
-    int_cs_n  = 'b0;    // default NOP command
-    int_ras_n = 'b1;
-    int_cas_n = 'b1;
-    int_we_n  = 'b1;
-    int_addr  = 'b0;
-    int_ba    = 'b0;
-    int_dqm   = 'b0;
-    int_dqo   = 'b0;
+    int_sdram_cke   = 'b1;      // default CLK = high
+    int_sdram_cs_n  = 'b0;      // default NOP command
+    int_sdram_ras_n = 'b1;
+    int_sdram_cas_n = 'b1;
+    int_sdram_we_n  = 'b1;
+    int_sdram_addr  = 'b0;
+    int_sdram_ba    = 'b0;
+    int_sdram_dqm   = 'b0;
+    int_sdram_dqo   = 'b0;
+
+    int_bus_ready   = 1'b0;
+    bus_req_cpl     = 1'b0;
 
     cmd_is_precharge = 1'b0;
     cmd_is_refresh   = 1'b0;
     cmd_is_lmr       = 1'b0;
+    cmd_is_active    = 1'b0;
+    cmd_is_write     = 1'b0;
+    cmd_is_read      = 1'b0;
+    cmd_is_precharge = 1'b0;
 
     // Note:
     //  1. To align the command with state, we use next state here as the case condition
     //  2. The command are send when we entering a specific state, else the NOP command is usually send to
     //     the wait time for the command to complete
-
     case(main_state_n)
         // Initialization Sequence
         INIT: begin
@@ -344,8 +512,8 @@ always_comb begin
                 INIT_PRECHARGE: begin
                     if (init_state == INIT_WAIT) begin
                         `cmd(CMD_PRECHARGE);
-                        int_addr[10] = 1'b1;    // precharge all bank
                         cmd_is_precharge = 1'b1;
+                        int_sdram_addr[10] = 1'b1;    // precharge all bank
                     end
                 end
                 INIT_AUTO_REF0: begin
@@ -364,12 +532,12 @@ always_comb begin
                     if (init_state == INIT_AUTO_REF1) begin
                         `cmd(CMD_LMR);
                         cmd_is_lmr = 1'b1;
-                        int_addr[2:0] = cfg_burst_length;
-                        int_addr[3]   = cfg_burst_type;
-                        int_addr[6:4] = cfg_cas_latency;
-                        int_addr[8:7] = 2'b0;
-                        int_addr[9]   = cfg_burst_mode;
-                        int_addr[RAW-1:10] = 'b0;
+                        int_sdram_addr[2:0] = cfg_burst_length;
+                        int_sdram_addr[3]   = cfg_burst_type;
+                        int_sdram_addr[6:4] = cfg_cas_latency;
+                        int_sdram_addr[8:7] = 2'b0;
+                        int_sdram_addr[9]   = cfg_burst_mode;
+                        int_sdram_addr[RAW-1:10] = 'b0;
                     end
                 end
                 INIT_DONE: begin
@@ -378,10 +546,67 @@ always_comb begin
                 default: `cmd(CMD_NOP);
             endcase
         end
+
+        // IDLE state
+        IDLE: begin
+            `cmd(CMD_NOP);
+            bus_req_cpl = 1'b1;
+            // Logic need to consider one extra latency of bus_ready because we flop it before sending it out
+            // 1. Set int_bus_ready = 1 when we are about to enter IDLE state
+            // 2. Set int_bus_ready = 0 when we get taking a new request in IDLE state
+            // OPT: This can be further optimized, we can register the bus request at PRECHARGE stage
+            //      and go ROW_ACTIVE stage directly after completing PRECHARGE
+            if (arc_precharge_2_idle) int_bus_ready = 1'b1;
+            else                      int_bus_ready = ~(bus_read | bus_write);
+        end
+
+        // ROW_ACTIVE state
+        ROW_ACTIVE: begin
+            if (arc_idle_2_row_active) begin    // active a row
+                `cmd(CMD_ACTIVE);
+                cmd_is_active = 1'b1;
+                int_sdram_ba = bank;
+                int_sdram_addr = row;
+            end
+        end
+
+        // WRITE_A State
+        WRITE_A: begin
+            if (arc_row_active_2_write_a) begin
+                `cmd(CMD_WRITE);
+                cmd_is_write = 1'b1;
+                int_sdram_ba = bank;
+                int_sdram_addr[CAW-1:0] = col;
+                int_sdram_dqm = ~int_bus_byteenable;
+                int_sdram_dqo = int_bus_wdata;
+            end
+        end
+
+        // READ_A State
+        READ_A: begin
+            if (arc_row_active_2_read_a) begin
+                `cmd(CMD_READ);
+                cmd_is_read = 1'b1;
+                int_sdram_ba = bank;
+                int_sdram_addr[CAW-1:0] = col;
+                int_sdram_dqm = ~int_bus_byteenable;
+            end
+        end
+
+        // PRECHARGE
+        PRECHARGE: begin
+            if (main_state != PRECHARGE) begin
+                `cmd(CMD_PRECHARGE);
+                cmd_is_precharge = 1'b1;
+                int_sdram_addr[10] = 1'b1;    // precharge all bank.
+            end
+        end
     endcase
 end
 
-// Register the output
+// ----------------------------------------------
+// Register the SDRAM output
+// ----------------------------------------------
 always_ff @(posedge clk) begin
     if (!rst_n) begin
         sdram_cke   <= 'b0;
@@ -395,19 +620,45 @@ always_ff @(posedge clk) begin
         sdram_dqo   <= 'b0;
     end
     else begin
-        sdram_cke   <= int_cke;
-        sdram_cs_n  <= int_cs_n;
-        sdram_ras_n <= int_ras_n;
-        sdram_cas_n <= int_cas_n;
-        sdram_we_n  <= int_we_n;
-        sdram_addr  <= int_addr;
-        sdram_ba    <= int_ba;
-        sdram_dqm   <= int_dqm;
-        sdram_dqo   <= int_dqo;
+        sdram_cke   <= int_sdram_cke;
+        sdram_cs_n  <= int_sdram_cs_n;
+        sdram_ras_n <= int_sdram_ras_n;
+        sdram_cas_n <= int_sdram_cas_n;
+        sdram_we_n  <= int_sdram_we_n;
+        sdram_addr  <= int_sdram_addr;
+        sdram_ba    <= int_sdram_ba;
+        sdram_dqm   <= int_sdram_dqm;
+        sdram_dqo   <= int_sdram_dqo;
     end
 end
 
 assign sdram_dq = (sdram_we_n == 0) ? sdram_dqo : {DW{1'bz}};
+
+/////////////////////////////////////////////////
+// SIMULATION
+/////////////////////////////////////////////////
+
+`ifdef SIMULATION
+
+// Showing state in STRING
+logic [95:0] main_state_str;
+always_comb begin
+    case (main_state)
+        RESET:        main_state_str = "RESET     ";
+        INIT:         main_state_str = "INIT      ";
+        MODE_REG_SET: main_state_str = "MODE_REG  ";
+        IDLE:         main_state_str = "IDLE      ";
+        ROW_ACTIVE:   main_state_str = "ROW_ACTIVE";
+        WRITE:        main_state_str = "WRITE     ";
+        WRITE_A:      main_state_str = "WRITE_A   ";
+        READ:         main_state_str = "READ      ";
+        READ_A:       main_state_str = "READ_A    ";
+        PRECHARGE:    main_state_str = "PRECHARGE ";
+        default:      main_state_str = "UNKNOWN   ";
+    endcase
+end
+
+`endif
 
 endmodule
 

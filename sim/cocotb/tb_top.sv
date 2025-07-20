@@ -14,50 +14,56 @@
 `timescale 1ns/1ps
 
 module tb_top;
+    parameter DW = 16;
+    parameter AW = 24;
 
     // Clock & reset
-    logic clk;
-    logic rst_n;
-
-    // AHB-Lite signals
-    logic [23:0] haddr;
-    logic [2:0]  hburst;
-    logic        hmasterlock;
-    logic [3:0]  hprot;
-    logic [2:0]  hsize;
-    logic [1:0]  htrans;
-    logic [15:0] hwdata;
-    logic        hwrite;
+    logic          clk;
+    logic          rst_n;
 
     // SDRAM config
-    logic [2:0]  cfg_burst_length;
-    logic        cfg_burst_type;
-    logic [2:0]  cfg_cas_latency;
-    logic        cfg_burst_mode;
+    logic [2:0]     cfg_burst_length;
+    logic           cfg_burst_type;
+    logic [2:0]     cfg_cas_latency;
+    logic           cfg_burst_mode;
+
+    // System Bus
+    logic           bus_read;
+    logic           bus_write;
+    logic [AW-1:0]  bus_addr;
+    logic           bus_burst;
+    logic [2:0]     bus_burst_len;
+    logic [DW-1:0]  bus_wdata;
+    logic [1:0]     bus_byteenable;
+    logic           bus_ready;
+    logic           bus_rvalid;
+    logic [DW-1:0]  bus_rdata;
 
     // SDRAM interface wires
-    wire         sdram_cke;
-    wire         sdram_cs_n;
-    wire         sdram_ras_n;
-    wire         sdram_cas_n;
-    wire         sdram_we_n;
-    wire [11:0]  sdram_addr;
-    wire [1:0]   sdram_ba;
-    wire [1:0]   sdram_dqm;
-    wire [15:0]  sdram_dq;
+    logic           sdram_cke;
+    logic           sdram_cs_n;
+    logic           sdram_ras_n;
+    logic           sdram_cas_n;
+    logic           sdram_we_n;
+    logic [11:0]    sdram_addr;
+    logic [1:0]     sdram_ba;
+    logic [1:0]     sdram_dqm;
+    wire  [15:0]    sdram_dq;
 
 
     sdram_MT48LC8M16A2 dut (
         .clk                (clk),
         .rst_n              (rst_n),
-        .haddr              (haddr),
-        .hburst             (hburst),
-        .hmasterlock        (hmasterlock),
-        .hprot              (hprot),
-        .hsize              (hsize),
-        .htrans             (htrans),
-        .hwdata             (hwdata),
-        .hwrite             (hwrite),
+        .bus_read           (bus_read),
+        .bus_write          (bus_write),
+        .bus_addr           (bus_addr),
+        .bus_burst          (bus_burst),
+        .bus_burst_len      (bus_burst_len),
+        .bus_wdata          (bus_wdata),
+        .bus_byteenable     (bus_byteenable),
+        .bus_ready          (bus_ready),
+        .bus_rvalid         (bus_rvalid),
+        .bus_rdata          (bus_rdata),
         .cfg_burst_length   (cfg_burst_length),
         .cfg_burst_type     (cfg_burst_type),
         .cfg_cas_latency    (cfg_cas_latency),

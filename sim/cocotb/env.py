@@ -13,6 +13,7 @@
 import cocotb
 from cocotb.triggers import FallingEdge, RisingEdge, Timer
 from cocotb.clock import Clock
+from bus import *
 
 def load_mode_reg(dut, burst_len=0, burst_type=0, cas=2, write_burst_mode=0):
     dut.cfg_burst_length.value  = burst_len
@@ -24,6 +25,7 @@ async def init(dut, period = 10):
     """
     Initialize the environment: setup clock, load the hack rom and reset the design
     """
+    bus_init(dut)
     # start clock
     cocotb.start_soon(Clock(dut.clk, period, units = 'ns').start()) # clock
     # generate reset
