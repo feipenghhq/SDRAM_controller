@@ -75,7 +75,7 @@ module sdram_controller #(
     output logic [RAW-1:0]  sdram_addr,             // Address for row/column addressing.
     output logic [1:0]      sdram_ba,               // Bank Address. Fixed for 4 banks
     output logic [DW/8-1:0] sdram_dqm,              // Data Mask
-    inout  logic [DW-1:0]   sdram_dq                // Data Input/Output bus.
+    inout  wire  [DW-1:0]   sdram_dq                // Data Input/Output bus.
 
 );
 
@@ -691,12 +691,3 @@ end
 `endif
 
 endmodule
-
-/*
-always_ff @(posedge clk) begin
-    if (!rst_n) begin
-    end
-    else begin
-    end
-end
-*/
