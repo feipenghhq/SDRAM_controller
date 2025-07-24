@@ -3,23 +3,23 @@ GIT_ROOT 	= $(shell git rev-parse --show-toplevel)
 SCRIPT_DIR 	= $(GIT_ROOT)/scripts/quartus
 
 # device part
-PART = EP2C35F672C7
+PART = EP4CE115F29C8
 # device family
-FAMILY = Cyclone II
+FAMILY = "Cyclone IV E"
 # project name
 PROJECT ?= sdram
 # top level name
 TOP ?= top
 # verilog source files
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_controller.sv
-VERILOG += $(GIT_ROOT)/rtl/chip/sdram_IS42S16400.sv
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_ctrl.sv
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_ip.v
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_host.sv
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/pll_25.v
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/pll_50.v
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/pll_100.v
-VERILOG += $(GIT_ROOT)/fpga/de2/top.sv
+VERILOG += $(GIT_ROOT)/rtl/chip/sdram_IS42S16320D.sv
+VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/vjtag_ctrl.sv
+VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/vjtag_ip.v
+VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/vjtag_host.sv
+VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/pll_25.v
+VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/pll_50.v
+VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/pll_100.v
+VERILOG += $(GIT_ROOT)/fpga/de2-115/top.sv
 # verilog include directory
 SEARCH ?=
 # verilog define

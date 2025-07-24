@@ -137,8 +137,8 @@ always_comb begin
     case(state)
         IDLE: begin
             if (request) begin
-                if      (wvalid) state_next = wready ? IDLE : REQ;
-                else if (rvalid) state_next = rready ? READ : REQ;
+                if      (is_write) state_next = wready ? IDLE : REQ;
+                else if (is_read)  state_next = rready ? READ : REQ;
             end
         end
         REQ: begin
@@ -157,6 +157,7 @@ always_ff @(posedge clk) begin
         rvalid <= 1'b0;
     end
     else begin
+        // Note: use next state here
         case(state_next)
             IDLE: begin
                 wvalid <= request & is_write;
@@ -165,6 +166,9 @@ always_ff @(posedge clk) begin
             REQ: begin
                 wvalid <= is_write;
                 rvalid <= is_read;
+            end
+            READ: begin
+                if (state != READ) rvalid <= is_read;
             end
         endcase
     end

@@ -178,7 +178,7 @@ proc cmd_read {word length dummy read_length} {
     set_vir 0x1
     set_vdr $length $word
     # read return data back
-    set_vir 0x0
+    set_vir 0x3
     return [read_vdr $read_length $dummy]
 }
 
@@ -213,7 +213,7 @@ proc process_exit {} {
 }
 
 proc process_write {addr data} {
-    device_lock -timeout 10000
+    device_lock -timeout 100000
     global addr_width
     global data_width
     scan $addr %i addr
@@ -229,7 +229,7 @@ proc process_read {addr} {
     global print_read_data
     global addr_width
     global data_width
-    device_lock -timeout 10000
+    device_lock -timeout 100000
     scan $addr %i addr
     set addr [format "%0*X" [ceil_div $addr_width 4] $addr]
     set dummy [format "%0*X" [ceil_div $data_width 4] 0]
@@ -245,7 +245,7 @@ proc process_program {addr file} {
     global addr_width
     global data_width
 
-    device_lock -timeout 10000
+    device_lock -timeout 100000
     puts "Assert reset"
     cmd_rst_assert
 

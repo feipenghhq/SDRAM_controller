@@ -8,6 +8,10 @@
 //
 // -------------------------------------------------------------------
 // vjtag_host: Top level for VJtag Host
+//
+// Limitation:
+//  The VJTAG interface does not support backpressure. If the bus is busy and unable to accept a request,
+//  it must become ready and accept the request before the next request from VJTAG interface arrives.
 // -------------------------------------------------------------------
 
 module vjtag_host #(

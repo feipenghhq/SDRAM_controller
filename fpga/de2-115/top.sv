@@ -22,11 +22,9 @@ module top
     output logic            SDRAM_RAS_N,
     output logic            SDRAM_CAS_N,
     output logic            SDRAM_WE_N,
-    output logic [11:0]     SDRAM_ADDR,
-    output logic            SDRAM_BA_0,
-    output logic            SDRAM_BA_1,
-    output logic            SDRAM_UDQM,
-    output logic            SDRAM_LDQM,
+    output logic [12:0]     SDRAM_ADDR,
+    output logic [1:0]      SDRAM_BA,
+    output logic [1:0]      SDRAM_DQM,
     inout  wire [15:0]      SDRAM_DQ
 );
 
@@ -59,7 +57,7 @@ assign bus_burst = 'b0;
 assign bus_burst_len = 'b0;
 assign bus_byteenable = 2'b11;
 
-localparam CLK_FREQ = 100;
+localparam CLK_FREQ = 50;
 
 generate
 if (CLK_FREQ == 25) begin
@@ -87,7 +85,7 @@ endgenerate
 assign rst_n = KEY;
 
 // Instantiate SDRAM Controller
-sdram_IS42S16400 #(.CLK_FREQ(CLK_FREQ))
+sdram_IS42S16320D #(.CLK_FREQ(CLK_FREQ))
 u_sdram (
     .clk                (clk),
     .rst_n              (rst_n),
@@ -111,7 +109,7 @@ u_sdram (
     .sdram_cas_n        (SDRAM_CAS_N),
     .sdram_we_n         (SDRAM_WE_N),
     .sdram_addr         (SDRAM_ADDR),
-    .sdram_ba           ({SDRAM_BA_1, SDRAM_BA_0}),
+    .sdram_ba           (SDRAM_BA),
     .sdram_dqm          ({SDRAM_UDQM, SDRAM_LDQM}),
     .sdram_dq           (SDRAM_DQ)
 );
