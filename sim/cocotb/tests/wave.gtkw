@@ -1,0 +1,88 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Thu Jul 24 00:02:04 2025
+[*]
+[dumpfile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/tests/sim_build/tb_top.fst"
+[dumpfile_mtime] "Thu Jul 24 00:01:41 2025"
+[dumpfile_size] 71618
+[savefile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/tests/wave.gtkw"
+[timestart] 201996300
+[size] 3370 1243
+[pos] -1 -1
+*-15.000000 202375001 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb_top.
+[treeopen] tb_top.dut.
+[sst_width] 315
+[signals_width] 420
+[sst_expanded] 1
+[sst_vpaned_height] 715
+@28
+tb_top.rst_n
+tb_top.clk
+@200
+-
+-BUS
+@28
+tb_top.dut.bus_read
+tb_top.dut.bus_write
+tb_top.dut.u_sdram_controller.bus_ready
+@22
+tb_top.dut.bus_addr[23:0]
+@28
+tb_top.dut.bus_burst
+tb_top.dut.bus_burst_len[2:0]
+tb_top.dut.bus_byteenable[1:0]
+@22
+tb_top.dut.bus_wdata[15:0]
+@28
+tb_top.dut.bus_read
+tb_top.dut.bus_rvalid
+@22
+tb_top.dut.bus_rdata[15:0]
+@200
+-
+-SDRAM
+@28
+tb_top.sdram_cke
+tb_top.sdram_cs_n
+tb_top.sdram_ras_n
+tb_top.sdram_cas_n
+tb_top.sdram_we_n
+(1)tb_top.sdram_addr[11:0]
+tb_top.sdram_ba[1:0]
+@c00024
+tb_top.sdram_addr[11:0]
+@28
+(0)tb_top.sdram_addr[11:0]
+(1)tb_top.sdram_addr[11:0]
+(2)tb_top.sdram_addr[11:0]
+(3)tb_top.sdram_addr[11:0]
+(4)tb_top.sdram_addr[11:0]
+(5)tb_top.sdram_addr[11:0]
+(6)tb_top.sdram_addr[11:0]
+(7)tb_top.sdram_addr[11:0]
+(8)tb_top.sdram_addr[11:0]
+(9)tb_top.sdram_addr[11:0]
+(10)tb_top.sdram_addr[11:0]
+(11)tb_top.sdram_addr[11:0]
+@1401200
+-group_end
+@28
+tb_top.sdram_dqm[1:0]
+@22
+tb_top.sdram_dq[15:0]
+@200
+-
+-INTERNAL
+@820
+tb_top.dut.u_sdram_controller.sdram_state_str[95:0]
+@200
+-
+-SDRAM
+@28
+tb_top.sdram_model.Sys_clk
+tb_top.dut.u_sdram_controller.int_bus_read
+tb_top.dut.u_sdram_controller.int_bus_write
+tb_top.dut.u_sdram_controller.read_latency[2:0]
+[pattern_trace] 1
+[pattern_trace] 0

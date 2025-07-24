@@ -13,6 +13,10 @@
 
 `timescale 1ns/1ps
 
+`ifndef CLK_FREQ
+`define CLK_FREQ 133
+`endif
+
 module tb_top;
     parameter DW = 16;
     parameter AW = 24;
@@ -40,6 +44,7 @@ module tb_top;
     logic [DW-1:0]  bus_rdata;
 
     // SDRAM interface wires
+    logic           sdram_clk;
     logic           sdram_cke;
     logic           sdram_cs_n;
     logic           sdram_ras_n;
@@ -51,32 +56,11 @@ module tb_top;
     wire  [15:0]    sdram_dq;
 
 
-    sdram_MT48LC8M16A2 dut (
-        .clk                (clk),
-        .rst_n              (rst_n),
-        .bus_read           (bus_read),
-        .bus_write          (bus_write),
-        .bus_addr           (bus_addr),
-        .bus_burst          (bus_burst),
-        .bus_burst_len      (bus_burst_len),
-        .bus_wdata          (bus_wdata),
-        .bus_byteenable     (bus_byteenable),
-        .bus_ready          (bus_ready),
-        .bus_rvalid         (bus_rvalid),
-        .bus_rdata          (bus_rdata),
-        .cfg_burst_length   (cfg_burst_length),
-        .cfg_burst_type     (cfg_burst_type),
-        .cfg_cas_latency    (cfg_cas_latency),
-        .cfg_burst_mode     (cfg_burst_mode),
-        .sdram_cke          (sdram_cke),
-        .sdram_cs_n         (sdram_cs_n),
-        .sdram_ras_n        (sdram_ras_n),
-        .sdram_cas_n        (sdram_cas_n),
-        .sdram_we_n         (sdram_we_n),
-        .sdram_addr         (sdram_addr),
-        .sdram_ba           (sdram_ba),
-        .sdram_dqm          (sdram_dqm),
-        .sdram_dq           (sdram_dq)
+    always_comb sdram_clk <= #1.5 clk;
+
+    sdram_MT48LC8M16A2 #(.CLK_FREQ(`CLK_FREQ))
+    dut (
+        .*
     );
 
     // SDRAM Model (Micron MT48LC8M16A2 compatible)
@@ -84,7 +68,7 @@ module tb_top;
         .Dq     (sdram_dq),
         .Addr   (sdram_addr),
         .Ba     (sdram_ba),
-        .Clk    (clk),
+        .Clk    (sdram_clk),
         .Cke    (sdram_cke),
         .Cs_n   (sdram_cs_n),
         .Ras_n  (sdram_ras_n),

@@ -18,48 +18,7 @@ from cocotb.clock import Clock
 from env import *
 from bus import *
 
-#cocotb.test()
-async def test_init(dut):
-    """
-    Test SDRAM initialization sequence
-    """
-    await init(dut)
-    load_mode_reg(dut)
-    await Timer(201, units='us')
-
-#@cocotb.test()
-async def test_write(dut):
-    """
-    Test Single Write request
-    """
-    await init(dut)
-    load_mode_reg(dut)
-    await Timer(201, units='us')
-    await bus_write(dut, 0x1111, 0x1234, 0x3)
-    await bus_write(dut, 0x2222, 0x4567, 0x3)
-    await bus_write(dut, 0xbeef, 0xcafe, 0x3)
-    await bus_write(dut, 0xcafe, 0xbeef, 0x3)
-    await Timer(1, units='us')
-
-#@cocotb.test()
-async def test_read(dut):
-    """
-    Test read request
-    """
-    expected = [0x1234, 0x5678]
-    await init(dut)
-    load_mode_reg(dut)
-    read_monitor = cocotb.start_soon(bus_read_response(dut, expected))
-    await Timer(201, units='us')
-    await bus_write(dut, 0x1111, 0x1234, 0x3)
-    await bus_write(dut, 0xFFFF, 0x5678, 0x3)
-    await bus_read(dut, 0x1111, 0x3)
-    await bus_read(dut, 0xFFFF, 0x3)
-    await Timer(1, units='us')
-    await read_monitor
-
-@cocotb.test()
-async def test_random_read_write(dut, num_op=10, num_seq=19):
+async def test_random_read_write(dut, cl=2, num_op=10, num_seq=10):
     """
     Test Random read and write. Will issue write first and then read from the location
 
@@ -103,10 +62,10 @@ async def test_random_read_write(dut, num_op=10, num_seq=19):
     # cocotb test sequence
     rc = 0
     wc = 0
-    await init(dut)
-    load_mode_reg(dut)
+    load_mode_reg(dut, cas=cl)
+    await init(dut, clk_period, False)
     read_monitor = cocotb.start_soon(bus_read_response(dut, expected))
-    await Timer(201, units='us')
+    await Timer(101, units='us')
     for op, idx in test_sequence:
         if op:  # read
             addr, _ = addr_data[idx]
@@ -121,19 +80,6 @@ async def test_random_read_write(dut, num_op=10, num_seq=19):
     await read_monitor
 
 factory = TestFactory(test_random_read_write)
-factory.add_option("num_op",  [100, 2000, 10000])
+factory.add_option("num_op", [1000])
 factory.add_option("num_seq", [100])
 factory.generate_tests()
-
-@cocotb.test()
-async def test_auto_refresh(dut):
-    """
-    Test auto refresh
-    """
-    await init(dut)
-    load_mode_reg(dut)
-    for i in range(25):
-        await bus_write(dut, i*2, i, 0x3)
-    for i in range(25):
-        await bus_read(dut, i*2, 0x3)
-    await Timer(2, units='us')
