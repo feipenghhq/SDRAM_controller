@@ -8,14 +8,19 @@
 //
 // -------------------------------------------------------------------
 // SDRAM Controller for Micro MT48LC8M16A2 SDR SDRAM
+// - SDRAM Size: 128Mb
+// - Data width: x16
+// - Row width:  12
+// - Col width:  9
 // -------------------------------------------------------------------
 
 module sdram_MT48LC8M16A2 #(
-    parameter DW = 16,          // x16
-    parameter AW = 24,          // SDRAM SIZE: 128Mb
-    parameter CLK_FREQ = 100,   // (MHz) clock frequency
-    parameter RAW = 12,         // Row addressing:    4K  A[11:0]
-    parameter CAW = 9           // Column addressing: 512 A[8:0]
+    parameter SPEED    = "-7E",     // Speed level: -6A/-7E/-75
+    parameter CLK_FREQ = 133,      // (MHz) clock frequency
+    parameter DW       = 16,       // x16
+    parameter AW       = 24,       // SDRAM SIZE: 128Mb
+    parameter RAW      = 12,       // Row addressing:    4K  A[11:0]
+    parameter CAW      = 9         // Column addressing: 512 A[8:0]
 ) (
     input  logic            clk,
     input  logic            rst_n,
@@ -51,27 +56,24 @@ module sdram_MT48LC8M16A2 #(
 // Parameter for SDRAM chip
 // ----------------------------------------------
 
-// sdram timing parameter
-localparam tRAS = 42;        // (ns) ACTIVE-to-PRECHARGE command
-localparam tRC  = 60;        // (ns) ACTIVE-to-ACTIVE command period
-localparam tRCD = 18;        // (ns) ACTIVE-to-READ or WRITE delay
-localparam tREF = 64;        // (ms) Refresh Period
-localparam tRFC = 60;        // (ns) AUTO REFRESH period
-localparam tRP  = 18;        // (ns) PRECHARGE command period
-localparam tRRD = 20;        // (ns) ACTIVE bank a to ACTIVE bank b command
-localparam cMRD = 2;         // (cycle) LOAD MODE REGISTER command to ACTIVE or REFRESH command
+//                                 "-6A"                   "-7E"                   "-75"
+localparam tRAS = (SPEED == "-6A") ? 42 : (SPEED == "-7E") ? 37 : (SPEED == "-75") ? 44 : 0; // (ns) ACTIVE-to-PRECHARGE command
+localparam tRC  = (SPEED == "-6A") ? 60 : (SPEED == "-7E") ? 60 : (SPEED == "-75") ? 66 : 0; // (ns) ACTIVE-to-ACTIVE command period
+localparam tRCD = (SPEED == "-6A") ? 18 : (SPEED == "-7E") ? 15 : (SPEED == "-75") ? 20 : 0; // (ns) ACTIVE-to-READ or WRITE delay
+localparam tRFC = (SPEED == "-6A") ? 60 : (SPEED == "-7E") ? 66 : (SPEED == "-75") ? 66 : 0; // (ns) AUTO REFRESH period
+localparam tRP  = (SPEED == "-6A") ? 18 : (SPEED == "-7E") ? 15 : (SPEED == "-75") ? 15 : 0; // (ns) PRECHARGE command period
+localparam tRRD = (SPEED == "-6A") ? 12 : (SPEED == "-7E") ? 14 : (SPEED == "-75") ? 15 : 0; // (ns) ACTIVE bank a to ACTIVE bank b command
+localparam tREF = (SPEED == "-6A") ? 64 : (SPEED == "-7E") ? 64 : (SPEED == "-75") ? 64 : 0; // (ms) Refresh Period
 
-// sdram initialization sequence
-localparam INIT_TIME = 100;  // (us) initialization NOP time
 
 // ----------------------------------------------
 // Instantiate the general sdram controller
 // ----------------------------------------------
 
 sdram_controller #(
+    .CLK_FREQ           (CLK_FREQ),
     .AW                 (AW),
     .DW                 (DW),
-    .CLK_FREQ           (CLK_FREQ),
     .RAW                (RAW),
     .CAW                (CAW),
     .tRAS               (tRAS),
@@ -80,35 +82,9 @@ sdram_controller #(
     .tREF               (tREF),
     .tRFC               (tRFC),
     .tRP                (tRP),
-    .tRRD               (tRRD),
-    .cMRD               (cMRD),
-    .INIT_TIME          (INIT_TIME)
+    .tRRD               (tRRD)
 ) u_sdram_controller (
-    .clk                (clk),
-    .rst_n              (rst_n),
-    .bus_read           (bus_read),
-    .bus_write          (bus_write),
-    .bus_addr           (bus_addr),
-    .bus_burst          (bus_burst),
-    .bus_burst_len      (bus_burst_len),
-    .bus_wdata          (bus_wdata),
-    .bus_byteenable     (bus_byteenable),
-    .bus_ready          (bus_ready),
-    .bus_rvalid         (bus_rvalid),
-    .bus_rdata          (bus_rdata),
-    .cfg_burst_length   (cfg_burst_length),
-    .cfg_burst_type     (cfg_burst_type),
-    .cfg_cas_latency    (cfg_cas_latency),
-    .cfg_burst_mode     (cfg_burst_mode),
-    .sdram_cke          (sdram_cke),
-    .sdram_cs_n         (sdram_cs_n),
-    .sdram_ras_n        (sdram_ras_n),
-    .sdram_cas_n        (sdram_cas_n),
-    .sdram_we_n         (sdram_we_n),
-    .sdram_addr         (sdram_addr),
-    .sdram_ba           (sdram_ba),
-    .sdram_dqm          (sdram_dqm),
-    .sdram_dq           (sdram_dq)
+    .*
 );
 
 endmodule

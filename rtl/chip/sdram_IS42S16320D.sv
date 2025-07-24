@@ -4,23 +4,23 @@
 //
 // Project: SDRAM Controller
 // Author: Heqing Huang
-// Date Created: 07/19/2025
+// Date Created: 07/23/2025
 //
 // -------------------------------------------------------------------
-// SDRAM Controller for ISSI IS42S16400 SDR SDRAM
-// - SDRAM Size: 64Mb
+// SDRAM Controller for ISSI IS42S16320D SDR SDRAM
+// - SDRAM Size: 512Mb
 // - Data width: x16
 // - Row width:  12
 // - Col width:  8
 // -------------------------------------------------------------------
 
-module sdram_IS42S16400 #(
-    parameter SPEED    = "-7",      // Speed level: -7/-8
+module sdram_IS42S16320D #(
+    parameter SPEED    = "-7",      // Speed level: -5/-6/-7
     parameter CLK_FREQ = 100,       // (MHz) clock frequency
     parameter DW       = 16,        // x16
-    parameter AW       = 23,        // SDRAM SIZE: 64Mb
-    parameter RAW      = 12,        // Row addressing:    2K  A[11:0]
-    parameter CAW      = 8          // Column addressing: 256 A[7:0]
+    parameter AW       = 26,        // SDRAM SIZE: 512Mb
+    parameter RAW      = 13,        // Row addressing:    8K A[13:0]
+    parameter CAW      = 10         // Column addressing: 1K A[9:0]
 ) (
     input  logic            clk,
     input  logic            rst_n,
@@ -56,14 +56,15 @@ module sdram_IS42S16400 #(
 // Parameter for SDRAM chip
 // ----------------------------------------------
 
-//                                 "-7"                   "-8"
-localparam tRAS = (SPEED == "-7") ? 68 : (SPEED == "-8") ? 70 : 0; // (ns) ACTIVE-to-PRECHARGE command
-localparam tRC  = (SPEED == "-7") ? 45 : (SPEED == "-8") ? 50 : 0; // (ns) ACTIVE-to-ACTIVE command period
-localparam tRCD = (SPEED == "-7") ? 20 : (SPEED == "-8") ? 20 : 0; // (ns) ACTIVE-to-READ or WRITE delay
-localparam tRFC = (SPEED == "-7") ? 68 : (SPEED == "-8") ? 70 : 0; // (ns) AUTO REFRESH period (Same as tRC in IS42S16400)
-localparam tRP  = (SPEED == "-7") ? 20 : (SPEED == "-8") ? 20 : 0; // (ns) PRECHARGE command period
-localparam tRRD = (SPEED == "-7") ? 15 : (SPEED == "-8") ? 20 : 0; // (ns) ACTIVE bank a to ACTIVE bank b command
-localparam tREF = (SPEED == "-7") ? 64 : (SPEED == "-8") ? 64 : 0; // (ms) Refresh Period
+
+//                                 "-5"                   "-6"                   "-7"
+localparam tRAS = (SPEED == "-5") ? 38 : (SPEED == "-6") ? 42 : (SPEED == "-7") ? 37 : 0; // (ns) ACTIVE-to-PRECHARGE command
+localparam tRC  = (SPEED == "-5") ? 55 : (SPEED == "-6") ? 60 : (SPEED == "-7") ? 60 : 0; // (ns) ACTIVE-to-ACTIVE command period
+localparam tRCD = (SPEED == "-5") ? 15 : (SPEED == "-6") ? 18 : (SPEED == "-7") ? 15 : 0; // (ns) ACTIVE-to-READ or WRITE delay
+localparam tRFC = (SPEED == "-5") ? 55 : (SPEED == "-6") ? 60 : (SPEED == "-7") ? 60 : 0; // (ns) AUTO REFRESH period
+localparam tRP  = (SPEED == "-5") ? 15 : (SPEED == "-6") ? 18 : (SPEED == "-7") ? 15 : 0; // (ns) PRECHARGE command period
+localparam tRRD = (SPEED == "-5") ? 10 : (SPEED == "-6") ? 12 : (SPEED == "-7") ? 14 : 0; // (ns) ACTIVE bank a to ACTIVE bank b command
+localparam tREF = (SPEED == "-5") ? 64 : (SPEED == "-6") ? 64 : (SPEED == "-7") ? 64 : 0; // (ms) Refresh Period
 
 // ----------------------------------------------
 // Instantiate the general sdram controller
