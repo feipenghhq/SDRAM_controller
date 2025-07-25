@@ -320,9 +320,10 @@ if {[info script] eq $::argv0} {
     # Read config and setup USB blaster
     read_config
     setup_blaster
-    access_test 0x0 0x1000
     #single_read_loc 0x1B8 0x1B8 1000
     #double_read_loc 0x0 0x1111 0x2 0x2222 1000
+    access_test 0x0 0x10
+    access_test 0x0 0x1000
     random_test 10000 10
     close
 }

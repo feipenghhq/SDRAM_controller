@@ -19,6 +19,7 @@ VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/vjtag_host.sv
 VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/pll_25.v
 VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/pll_50.v
 VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/pll_100.v
+VERILOG += $(GIT_ROOT)/fpga/de2-115/rtl/pll_130.v
 VERILOG += $(GIT_ROOT)/fpga/de2-115/top.sv
 # verilog include directory
 SEARCH ?=

@@ -52,14 +52,13 @@ logic            rst_n;
 
 assign cfg_burst_length = 3'd0;
 assign cfg_burst_type   = 1'd0;
-assign cfg_cas_latency  = 3'd3;
 assign cfg_burst_mode   = 1'd0;
 
 assign bus_burst = 'b0;
 assign bus_burst_len = 'b0;
 assign bus_byteenable = 2'b11;
 
-localparam CLK_FREQ = 100;
+localparam CLK_FREQ = 130;
 
 generate
 if (CLK_FREQ == 25) begin
@@ -67,6 +66,7 @@ if (CLK_FREQ == 25) begin
         .inclk0 (CLOCK_50),
         .c0     (clk),
         .c1     (SDRAM_CLK));
+    assign cfg_cas_latency  = 3'd2;
 end
 
 if (CLK_FREQ == 50) begin
@@ -74,6 +74,7 @@ if (CLK_FREQ == 50) begin
         .inclk0 (CLOCK_50),
         .c0     (clk),
         .c1     (SDRAM_CLK));
+    assign cfg_cas_latency  = 3'd2;
 end
 
 if (CLK_FREQ == 100) begin
@@ -81,7 +82,17 @@ if (CLK_FREQ == 100) begin
         .inclk0 (CLOCK_50),
         .c0     (clk),
         .c1     (SDRAM_CLK));
+    assign cfg_cas_latency  = 3'd3;
 end
+
+if (CLK_FREQ == 130) begin // CLK FREQ is actual 130
+    pll_130 u_pll(
+        .inclk0 (CLOCK_50),
+        .c0     (clk),
+        .c1     (SDRAM_CLK));
+    assign cfg_cas_latency  = 3'd3;
+end
+
 endgenerate
 
 assign rst_n = KEY;

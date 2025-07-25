@@ -30,7 +30,7 @@ set_global_assignment -name VERILOG_MACRO "SYNTHESIS=1"
 set_global_assignment -name TOP_LEVEL_ENTITY $QUARTUS_TOP
 #set_global_assignment -name VERILOG_NON_CONSTANT_LOOP_LIMIT 10000
 #set_global_assignment -name VERILOG_CONSTANT_LOOP_LIMIT 30000
-#set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
+set_global_assignment -name NUM_PARALLEL_PROCESSORS ALL
 
 # Read in the Define
 foreach define $QUARTUS_DEFINE {

@@ -231,7 +231,8 @@ logic                       cmd_is_read_a;
 //logic                       cmd_is_read;
 
 // CL counter to indicate read data ready
-logic [1:0]                 cl_cnt;
+logic [1:0]                 read_latency;       // read latency. From when READ is issued to READ data is ready on DQ
+logic [1:0]                 read_latency_cnt;
 logic                       wait_rdata;         // read request issue, waiting for read data
 
 /////////////////////////////////////////////////
@@ -455,18 +456,20 @@ assign cmd_cpl = cmd_cnt == 0;
 // CAS Latency counter
 // ----------------------------------------------
 
+assign read_latency = cfg_cas_latency[1:0];
+
 // Check when read data is available
 always_ff @(posedge clk) begin
     if (!rst_n) begin
-        cl_cnt <= 'b0;
+        read_latency_cnt <= 'b0;
         wait_rdata <= 1'b0;
     end
     else begin
-        if (cmd_is_read_a)      cl_cnt <= cfg_cas_latency[1:0];
-        else if (cl_cnt != 0)   cl_cnt <= cl_cnt - 1'b1;
+        if (cmd_is_read_a)              read_latency_cnt <= read_latency;
+        else if (read_latency_cnt != 0) read_latency_cnt <= read_latency_cnt - 1'b1;
 
-        if (cmd_is_read_a)      wait_rdata <= 1'b1;
-        else if (cl_cnt == 0)   wait_rdata <= 1'b0;
+        if (cmd_is_read_a)              wait_rdata <= 1'b1;
+        else if (read_latency_cnt == 0) wait_rdata <= 1'b0;
     end
 end
 
@@ -477,7 +480,7 @@ end
 // Decode the bus address to sdram bank, row, col
 assign {bank, row, col} = int_bus_addr[AW-1:BW];
 
-assign int_bus_rvalid   = wait_rdata & (cl_cnt == 0);
+assign int_bus_rvalid   = wait_rdata & (read_latency_cnt == 0);
 assign int_bus_rdata    = sdram_dq;
 
 always_comb begin
