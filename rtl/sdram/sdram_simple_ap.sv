@@ -7,7 +7,7 @@
 // Date Created: 07/16/2025
 //
 // -------------------------------------------------------------------
-// SDRAM Controller
+// SDRAM Controller Simple (no burst) with Auto Precharge
 //
 // Supported SDRAM Features:
 //     1. Single Read/Write access with Auto-precharge
@@ -18,7 +18,7 @@
 // -------------------------------------------------------------------
 
 
-module sdram_controller #(
+module sdram_simple_ap #(
     parameter CLK_FREQ = 100,   // (MHz) clock frequency
     parameter AW = 24,          // Bus Address width. Should match with SDRAM size
     parameter DW = 16,          // Bus Data width
@@ -83,6 +83,7 @@ parameter ROW_COUNT = 2**RAW;   // SDRAM row count
 /////////////////////////////////////////////////
 
 // Calculate the SDRAM timing in terms of number of clock cycle
+/* verilator lint_off UNUSEDPARAM */
 localparam cRAS = ceil_div(tRAS * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE-to-PRECHARGE command
 localparam cRC  = ceil_div(tRC  * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE-to-ACTIVE command period
 localparam cRCD = ceil_div(tRCD * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE-to-READ or WRITE delay
@@ -90,6 +91,7 @@ localparam cRFC = ceil_div(tRFC * CLK_FREQ, 1000);      // (CLK Cycle) AUTO REFR
 localparam cRP  = ceil_div(tRP  * CLK_FREQ, 1000);      // (CLK Cycle) PRECHARGE command period
 localparam cRRD = ceil_div(tRRD * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE bank a to ACTIVE bank b command
 localparam cWR  = ceil_div(tWR  * CLK_FREQ, 1000);      // (CLK Cycle) WRITE recovery time (WRITE completion to PRECHARGE period)
+/* verilator lint_on UNUSEDPARAM */
 
 // Bus Decode
 localparam NUM_BYTE      = DW / 8;                      // Number of byte
@@ -102,7 +104,6 @@ localparam CMD_NOP       = 4'b0111;                     // NO OPERATION
 localparam CMD_ACTIVE    = 4'b0011;                     // BANK ACTIVE
 localparam CMD_READ      = 4'b0101;                     // READ
 localparam CMD_WRITE     = 4'b0100;                     // WRITE
-localparam CMD_BST       = 4'b0110;                     // BURST TERMINATE
 localparam CMD_PRECHARGE = 4'b0010;                     // PRECHARGE
 localparam CMD_REFRESH   = 4'b0001;                     // AUTO REFRESH or SELF REFRESH
 localparam CMD_LMR       = 4'b0000;                     // LOAD MODE REGISTER
@@ -125,14 +126,10 @@ localparam CMD_CNT_WIDTH = 4;
 typedef enum logic [3:0] {
     SDRAM_RESET,              // Start up State
     SDRAM_INIT,               // SDRAM initialization
-    SDRAM_MODE_REG_SET,       // Mode Register set
     SDRAM_IDLE,               // IDLE state (after bank have been pre-charged)
     SDRAM_ROW_ACTIVE,         // Active a row
-    SDRAM_WRITE,              // Write without auto precharge
     SDRAM_WRITE_A,            // Write with auto precharge
-    SDRAM_READ,               // Read without auto precharge
     SDRAM_READ_A,             // Read with auto precharge
-    SDRAM_PRECHARGE,          // Precharge the bank
     SDRAM_AUTO_REFRESH        // Auto Refresh
 } sdram_state_t;
 
@@ -155,14 +152,10 @@ typedef enum logic [3:0] {
 sdram_state_t               sdram_state, sdram_state_n;
 logic                       s_RESET;
 logic                       s_INIT;
-logic                       s_MODE_REG_SET;
 logic                       s_IDLE;
 logic                       s_ROW_ACTIVE;
-logic                       s_WRITE;
 logic                       s_WRITE_A;
-logic                       s_READ;
 logic                       s_READ_A;
-logic                       s_PRECHARGE;
 logic                       s_AUTO_REFRESH;
 logic                       arc_RESET_to_INIT;
 logic                       arc_INIT_to_IDLE;
@@ -172,7 +165,6 @@ logic                       arc_ROW_ACTIVE_to_WRITE_A;
 logic                       arc_ROW_ACTIVE_to_READ_A;
 logic                       arc_WRITE_A_to_IDLE;
 logic                       arc_READ_A_to_IDLE;
-logic                       arc_PRECHARGE_to_IDLE;
 logic                       arc_AUTO_REFRESH_to_IDLE;
 logic                       arc_AUTO_REFRESH_to_ROW_ACTIVE;
 
@@ -182,9 +174,11 @@ sdram_init_state_t          init_state, init_state_n;
 // Internal system bus, these are registered version of the system bus
 logic                       int_bus_read;
 logic                       int_bus_write;
+/* verilator lint_off UNUSEDSIGNAL */
 logic [AW-1:0]              int_bus_addr;
 logic                       int_bus_burst;
 logic [2:0]                 int_bus_burst_len;
+/* verilator lint_on UNUSEDSIGNAL */
 logic [DW-1:0]              int_bus_wdata;
 logic [DW/8-1:0]            int_bus_byteenable;
 logic                       int_bus_ready;
@@ -298,14 +292,10 @@ end
 // Indicating current state
 assign s_RESET        = (sdram_state == SDRAM_RESET);
 assign s_INIT         = (sdram_state == SDRAM_INIT);
-assign s_MODE_REG_SET = (sdram_state == SDRAM_MODE_REG_SET);
 assign s_IDLE         = (sdram_state == SDRAM_IDLE);
 assign s_ROW_ACTIVE   = (sdram_state == SDRAM_ROW_ACTIVE);
-assign s_WRITE        = (sdram_state == SDRAM_WRITE);
 assign s_WRITE_A      = (sdram_state == SDRAM_WRITE_A);
-assign s_READ         = (sdram_state == SDRAM_READ);
 assign s_READ_A       = (sdram_state == SDRAM_READ_A);
-assign s_PRECHARGE    = (sdram_state == SDRAM_PRECHARGE);
 assign s_AUTO_REFRESH = (sdram_state == SDRAM_AUTO_REFRESH);
 
 // state transaction arc
@@ -360,7 +350,6 @@ always_comb begin
         arc_ROW_ACTIVE_to_READ_A:           sdram_state_n = SDRAM_READ_A;
         arc_WRITE_A_to_IDLE:                sdram_state_n = SDRAM_IDLE;
         arc_READ_A_to_IDLE:                 sdram_state_n = SDRAM_IDLE;
-        arc_PRECHARGE_to_IDLE:              sdram_state_n = SDRAM_IDLE;
         arc_AUTO_REFRESH_to_IDLE:           sdram_state_n = SDRAM_IDLE;
         arc_AUTO_REFRESH_to_ROW_ACTIVE:     sdram_state_n = SDRAM_ROW_ACTIVE;
         default:                            sdram_state_n = sdram_state;
@@ -503,13 +492,18 @@ always_comb begin
     // disable bus_ready when we get a new request or then there are request already pending/in progress
     int_bus_ready   = ~bus_req & ~int_bus_req;
 
+    /* verilator lint_off CASEINCOMPLETE */
     case(sdram_state)
+    /* verilator lint_on CASEINCOMPLETE */
 
         SDRAM_INIT: begin
 
             int_bus_ready = 1'b0;   // not ready to take any request during initialization
 
+            /* verilator lint_off CASEINCOMPLETE */
             case(init_state)
+            /* verilator lint_on CASEINCOMPLETE */
+
                 INIT_IDLE: begin
                     if (arc_RESET_to_INIT) sdram_ctrl(CMD_DESL);
                 end
@@ -671,6 +665,8 @@ task automatic sdram_ctrl(input logic [3:0] cmd);
     int_sdram_we_n  = cmd[0];
 endtask
 
+// Assign the COL address
+// Consider the case when CAW > 10 since A[10] is used for auto precharge
 /* verilator lint_off SELRANGE */
 task automatic sdram_col_addr();
     if (CAW > 10) begin
@@ -720,14 +716,10 @@ always_comb begin
     case (sdram_state)
         SDRAM_RESET:        sdram_state_str = "RESET     ";
         SDRAM_INIT:         sdram_state_str = "INIT      ";
-        SDRAM_MODE_REG_SET: sdram_state_str = "MODE_REG  ";
         SDRAM_IDLE:         sdram_state_str = "IDLE      ";
         SDRAM_ROW_ACTIVE:   sdram_state_str = "ROW_ACTIVE";
-        SDRAM_WRITE:        sdram_state_str = "WRITE     ";
         SDRAM_WRITE_A:      sdram_state_str = "WRITE_A   ";
-        SDRAM_READ:         sdram_state_str = "READ      ";
         SDRAM_READ_A:       sdram_state_str = "READ_A    ";
-        SDRAM_PRECHARGE:    sdram_state_str = "PRECHARGE ";
         SDRAM_AUTO_REFRESH: sdram_state_str = "AUTO_REFRESH";
         default:            sdram_state_str = "UNKNOWN   ";
     endcase

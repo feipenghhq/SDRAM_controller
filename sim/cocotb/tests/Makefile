@@ -28,4 +28,4 @@ MODULE = test_basic
 include $(shell cocotb-config --makefiles)/Makefile.sim
 
 lint:
-	verilator --lint-only -Wall $(RTL_SOURCES)
+	verilator --lint-only -Wall $(RTL_SOURCES) --top-module sdram_controller
