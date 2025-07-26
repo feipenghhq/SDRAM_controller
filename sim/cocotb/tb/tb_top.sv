@@ -55,8 +55,10 @@ module tb_top;
     logic [1:0]     sdram_dqm;
     wire  [15:0]    sdram_dq;
 
+    localparam CLK_PERIOD = 1000 / `CLK_FREQ;
+    localparam CLK_DELAY  = CLK_PERIOD - 1;
 
-    always_comb sdram_clk <= #1.5 clk;
+    always_comb sdram_clk <= #CLK_DELAY clk;
 
     sdram_MT48LC8M16A2 #(.CLK_FREQ(`CLK_FREQ))
     dut (

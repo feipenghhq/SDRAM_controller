@@ -192,7 +192,6 @@ logic                       int_bus_rvalid;
 logic [DW-1:0]              int_bus_rdata;
 
 logic                       bus_req;            // new bus request
-logic                       bus_cpl;            // bus request completion
 
 // Address mapping to sdram {bank, row, col}
 logic [1:0]                 bank;               // band address
@@ -227,8 +226,6 @@ logic                       cmd_is_refresh;
 logic                       cmd_is_active;
 logic                       cmd_is_write_a;
 logic                       cmd_is_read_a;
-//logic                       cmd_is_write;
-//logic                       cmd_is_read;
 
 // CL counter to indicate read data ready
 logic [1:0]                 read_latency;       // read latency. From when READ is issued to READ data is ready on DQ
@@ -257,7 +254,7 @@ always_ff @(posedge clk) begin
             int_bus_read   <= bus_read;
             int_bus_write  <= bus_write;
         end
-        else if (bus_cpl) begin
+        else if (int_bus_ready) begin
             int_bus_read   <= 1'b0;
             int_bus_write  <= 1'b0;
         end
@@ -316,7 +313,7 @@ assign arc_RESET_to_INIT = s_RESET;
 assign arc_INIT_to_IDLE = s_INIT & (init_state == INIT_DONE);
 
 // IDLE -> ROW_ACTIVE: Get a new bus request
-assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & (int_bus_read | int_bus_write);
+assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & (int_bus_read | int_bus_write) & ~ir_cnt_zero; // FIXME: 1. IDLE takes 2 clock
 
 // IDLE -> AUTO_REFRESH
 assign arc_IDLE_to_AUTO_REFRESH = s_IDLE & ir_cnt_zero;
@@ -339,7 +336,7 @@ assign arc_READ_A_to_IDLE = s_READ_A & cmd_cpl;
 // AUTO_REFRESH -> IDLE: Complete the auto refresh operation and no request pending
 assign arc_AUTO_REFRESH_to_IDLE = s_AUTO_REFRESH & cmd_cpl & ~(int_bus_write | int_bus_read);
 
-// AUTO_REFRESH -> IDLE: Complete the auto refresh operation but request pending
+// AUTO_REFRESH -> IDLE: Complete the auto refresh operation and request pending
 assign arc_AUTO_REFRESH_to_ROW_ACTIVE = s_AUTO_REFRESH & cmd_cpl & (int_bus_write | int_bus_read);
 
 // state transition
@@ -493,8 +490,7 @@ always_comb begin
     int_sdram_dqo   = 'b0;
     int_sdram_dq_en = 'b0;
 
-    int_bus_ready   = 1'b0;
-    bus_cpl         = 1'b0;
+    int_bus_ready   = 1'b0;     // set default int_bus_ready to 0
 
     cmd_is_precharge = 1'b0;
     cmd_is_refresh   = 1'b0;
@@ -504,37 +500,39 @@ always_comb begin
     cmd_is_read_a    = 1'b0;
     cmd_is_precharge = 1'b0;
 
-    // Note:
-    //      To align the command with state, we use next state here as the case condition
-    case(sdram_state_n)
+    case(sdram_state)
 
-        // Nest state is INIT: Initialization Sequence
         SDRAM_INIT: begin
-            case(init_state_n)
+            case(init_state)
+                INIT_IDLE: begin
+                    if (arc_RESET_to_INIT) sdram_ctrl(CMD_DESL);
+                end
                 INIT_WAIT: begin
                     sdram_ctrl(CMD_DESL);
-                end
-                INIT_PRECHARGE: begin
-                    if (init_state == INIT_WAIT) begin
+                    // going to INIT_PRECHARGE state: scheduling Precharge command
+                    if (ir_cnt_zero) begin
                         sdram_ctrl(CMD_PRECHARGE);
                         cmd_is_precharge = 1'b1;
-                        int_sdram_addr[10] = 1'b1;    // precharge all bank
+                        int_sdram_addr[10] = 1'b1;
+                    end
+                end
+                INIT_PRECHARGE: begin
+                    // going to AUTO_REF0 state: scheduling 1st Auto Refresh command
+                    if (cmd_cpl) begin
+                        sdram_ctrl(CMD_REFRESH);      // auto-refresh (cke=1)
+                        cmd_is_refresh = 1'b1;
                     end
                 end
                 INIT_AUTO_REF0: begin
-                    if (init_state == INIT_PRECHARGE) begin
+                    // going to AUTO_REF1 state: scheduling 2nd Auto Refresh command
+                    if (cmd_cpl) begin
                         sdram_ctrl(CMD_REFRESH);      // auto-refresh (cke=1)
                         cmd_is_refresh = 1'b1;
                     end
                 end
                 INIT_AUTO_REF1: begin
-                    if (init_state == INIT_AUTO_REF0) begin
-                        sdram_ctrl(CMD_REFRESH);      // auto-refresh (cke=1)
-                        cmd_is_refresh = 1'b1;
-                    end
-                end
-                INIT_SET_MODE_REG: begin
-                    if (init_state == INIT_AUTO_REF1) begin
+                    // going to SET_MODE_REG state: scheduling Set Mode Register command
+                    if (cmd_cpl) begin
                         sdram_ctrl(CMD_LMR);
                         cmd_is_lmr = 1'b1;
                         int_sdram_addr      = 0;    // set all the served bit to 0
@@ -547,28 +545,28 @@ always_comb begin
             endcase
         end
 
-        // Next state is IDLE: Wait for a new request
         SDRAM_IDLE: begin
-            bus_cpl = 1'b1;
-            // when entering IDLE state, set the bus ready
-            if (!s_IDLE) int_bus_ready = 1'b1;
-            else         int_bus_ready = ~(bus_read | bus_write);
-        end
-
-        // Next state is ROW_ACTIVE:
-        SDRAM_ROW_ACTIVE: begin
-            // when entering ROW_ACTIVE state, sent the ACTIVE command
-            if (!s_ROW_ACTIVE) begin
+            // disable bus_ready when we get a new request
+            int_bus_ready = ~bus_req;
+            // going to AUTO_REFRESH state: scheduling Auto Refresh command
+            if (arc_IDLE_to_AUTO_REFRESH) begin
+                sdram_ctrl(CMD_REFRESH);      // auto-refresh (cke=1)
+                cmd_is_refresh = 1'b1;
+                int_bus_ready = 1'b0;
+            end
+            // going to ROW_ACTIVE state: scheduling ACTIVE command
+            else if (arc_IDLE_to_ROW_ACTIVE) begin
                 sdram_ctrl(CMD_ACTIVE);
                 cmd_is_active = 1'b1;
                 int_sdram_ba = bank;
                 int_sdram_addr = row;
+                int_bus_ready = 1'b0;
             end
         end
 
-        // Next state is WRITE_A (Write with Auto Precharge):
-        SDRAM_WRITE_A: begin
-            if (!s_WRITE_A) begin
+        SDRAM_ROW_ACTIVE: begin
+            // going to WRITE_A: schedule WRITE with Auto Precharge
+            if (arc_ROW_ACTIVE_to_WRITE_A) begin
                 sdram_ctrl(CMD_WRITE);
                 cmd_is_write_a = 1'b1;
                 int_sdram_addr[10] = 1'b1;
@@ -578,11 +576,8 @@ always_comb begin
                 int_sdram_dqo = int_bus_wdata;
                 int_sdram_dq_en = 1'b1;
             end
-        end
-
-        // Next state is READ_A (Read with Auto Precharge):
-        SDRAM_READ_A: begin
-            if (!s_READ_A) begin
+            // going to READ_A: schedule READ with Auto Precharge
+            else if (arc_ROW_ACTIVE_to_READ_A) begin
                 sdram_ctrl(CMD_READ);
                 cmd_is_read_a = 1'b1;
                 int_sdram_addr[10] = 1'b1;
@@ -592,20 +587,32 @@ always_comb begin
             end
         end
 
-        // PRECHARGE
-        SDRAM_PRECHARGE: begin
-            if (!s_PRECHARGE) begin
-                sdram_ctrl(CMD_PRECHARGE);
-                cmd_is_precharge = 1'b1;
-                int_sdram_addr[10] = 1'b1;    // precharge all bank.
+        SDRAM_WRITE_A: begin
+            // Write complete. Going back to IDLE state
+            if (arc_WRITE_A_to_IDLE) begin
+                int_bus_ready = 1'b1;
             end
         end
 
-        // Next state is AUTO_REFRESH
+        SDRAM_READ_A: begin
+            // Read complete. Going back to IDLE state
+            if (arc_READ_A_to_IDLE) begin
+                int_bus_ready = 1'b1;
+            end
+        end
+
         SDRAM_AUTO_REFRESH: begin
-            if (!s_AUTO_REFRESH) begin
-                sdram_ctrl(CMD_REFRESH);        // auto-refresh (cke=1)
-                cmd_is_refresh = 1'b1;
+            // Auto refresh complete. Going back to IDLE state
+            if (arc_AUTO_REFRESH_to_IDLE) begin
+                int_bus_ready = 1'b1;
+            end
+            // Auto refresh complete but request pending. Going to ROW_ACTIVE state
+            else if (arc_AUTO_REFRESH_to_ROW_ACTIVE) begin
+                sdram_ctrl(CMD_ACTIVE);
+                cmd_is_active = 1'b1;
+                int_sdram_ba = bank;
+                int_sdram_addr = row;
+                int_bus_ready = 1'b0;
             end
         end
     endcase
