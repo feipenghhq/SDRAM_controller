@@ -4,83 +4,151 @@ A high-performance SDRAM controller designed to interface with standard SDRAM ch
 
 ## Features
 
-- Compatible with [insert SDRAM chip model, e.g., MT48LC4M16A2]
 - Fully synchronous design
-- Supports:
-  - Initialization sequence per JEDEC standard
-  - Auto-refresh management
-  - Read/Write with burst support
-  - CAS latency configuration
+- Compliant with JEDEC standard initialization sequence
+- Auto-refresh management
+- Read/Write support with burst transactions
+- Configurable CAS latency
 - Parameterizable address and data widths
-- Designed for FPGA implementation
+- Modular architecture with multiple variants for different feature sets
+- Support up to 133MHz (Tested in FPGA board)
+
+## Repository Structure
+
+```text
+.
+├── doc                 # Documentation (datasheets, implementation)
+│   ├── datasheets
+├── fpga                # FPGA board-specific projects
+│   ├── de2
+│   └── de2-115
+├── LICENSE
+├── README.md
+├── rtl                 # RTL source code for SDRAM controller
+│   ├── chip            # Pre-defined controller top level for different SDRAM chip
+│   └── sdram           # Various SDRAM controller implementation
+├── scripts
+│   ├── quartus         # Quartus build script
+│   └── sdram_test      # Test script using Virtual JTAG
+└── sim
+    └── cocotb          # Cocotb simulation collateral
+```
+
+## SDRAM Interface and Timing
+
+### SDRAM Interface
+
+| Signal        | Direction | Description                                      |
+| ------------- | --------- | ------------------------------------------------ |
+| `sdram_cke`   | Output    | Clock Enable. Enables the SDRAM clock.           |
+| `sdram_cs_n`  | Output    | Chip Select (Active Low).                        |
+| `sdram_ras_n` | Output    | Row Address Strobe (Active Low).                 |
+| `sdram_cas_n` | Output    | Column Address Strobe (Active Low).              |
+| `sdram_we_n`  | Output    | Write Enable (Active Low).                       |
+| `sdram_addr`  | Output    | Address bus. Provides row/column address.        |
+| `sdram_ba`    | Output    | Bank Address. Selects the SDRAM bank.            |
+| `sdram_dqm`   | Output    | Data Mask. Controls byte-wise access.            |
+| `sdram_dq`    | Inout     | Bidirectional data bus. Carries read/write data. |
+
+### SDRAM Timing
+
+| Parameter | Unit | Description                                              |
+| --------- | ---- | -------------------------------------------------------- |
+| `tRAS`    | ns   | ACTIVE-to-PRECHARGE command time                         |
+| `tRC`     | ns   | ACTIVE-to-ACTIVE command period                          |
+| `tRCD`    | ns   | ACTIVE-to-READ or WRITE delay                            |
+| `tRFC`    | ns   | AUTO REFRESH command period                              |
+| `tRP`     | ns   | PRECHARGE command period                                 |
+| `tRRD`    | ns   | Minimum delay between ACTIVE commands to different banks |
+| `tWR`     | ns   | WRITE recovery time (WRITE completion to PRECHARGE)      |
+| `tREF`    | ms   | Refresh period (time to refresh all rows)                |
+
+The timing can usually be found in the SDRAM Datasheet
 
 ## Implementation
 
-### Parameters
+### SDRAM Controller Variants
 
-#### System Parameters
+This repository includes multiple SDRAM controller variants with different features sets
 
-| Name        | Description   |
-| ----------- | ------------- |
-| ADDR_WIDTH  | Address Width |
-| DATA_WIDTH  | Data Width    |
+The details of each design are documented in [sdram_implementation.md](doc/sdram_implementation.md).
 
-#### SDRAM Parameters
+Currently these are the planned features sets:
 
-### Interfaces
+| Name               | Precharge Type   | Burst Support             | Status      |
+| ------------------ | ---------------- | ------------------------- | ----------- |
+| sdram_simple_ap.sv | auto precharge   | Single read/write only    | Done        |
+| sdram_simple_mp.sv | manual precharge | Single read/write only    | In progress |
+| sdram_burst_mp.sv  | manual precharge | Support burst transaction | TBD         |
 
-#### Clock and Reset
+The RTL source file are located in `rtl/sdram`.
 
-| Signal Name | Direction | Width | Description              |
-| ----------- | --------- | ----- | ------------------------ |
-| `clk`       | Input     | 1     | System clock.            |
-| `rst_n`     | Input     | 1     | Active-low reset signal. |
+### Pre-configured Top Modules for Target SDRAM Chip
 
-#### Bus Interface
+The repository also provides predefined top-level modules tailored for specific SDRAM chips.
+These modules come with parameters already configured to match the timing and organization of the target memory device.
 
-To provide high performance, We use AHB-Lite as the main bus interface to interact with the SDRAM Controller
+The RTL source for pre-configured top modules are located in `rtl/chip`.
 
-##### Host Signals
+### Design Note
 
-| Signal Name   | Direction | Width | Description                                                                             |
-| ------------- | --------- | ----- | --------------------------------------------------------------------------------------- |
-| `haddr`       | Input     | AW    | System address bus. The width should match with the size of the SDRAM.                  |
-| `hburst`      | Input     | 3     | The burst type indicates if the transfer is a single transfer or forms part of a burst. |
-| `hmasterlock` | Input     | 1     | When HIGH, this signal indicates that the current transfer is part of a locked sequence |
-| `hprot`       | Input     | 4     | Protection control signals. **Not Used**.                                               |
-| `hsize`       | Input     | 3     | Transfer size: byte, halfword, word.                                                    |
-| `htrans`      | Input     | 2     | Transfer type: IDLE, BUSY, NONSEQ, SEQ.                                                 |
-| `hwdata`      | Input     | DW    | Write data bus.                                                                         |
-| `hwrite`      | Input     | 1     | Transfer direction: 1 = write, 0 = read.                                                |
+ See [sdram_implementation.md](doc/sdram_implementation.md) for detailed documentation on:
+ - parameter and interface
+ - state machine
+ - timing diagrams
 
-##### Device Signals
+#### Important Architecture Note
 
-| Signal Name | Direction | Width | Description                                                                       |
-| ----------- | --------- | ----- | --------------------------------------------------------------------------------- |
-| `hrdata`    | Output    | DW    | Read data bus.                                                                    |
-| `hreadyout` | Output    | 1     | When HIGH, the HREADYOUT signal indicates that a transfer has finished on the bus |
-| `hresp`     | Output    | 1     | Transfer response: OKAY, ERROR, etc.                                              |
+1. **Custom bus interface**
+    - Currently the design use a custom bus interface to interact with the sdram controller.
+    - Future version may support industry standard interface such as **AHB-Lite** or **AXI**
+
+2. **Single Clock domain**
+    - The SDRAM controller runs in a single clock domain. The SDRAM clock is driven at the same frequency as the system clock.
+    - Future version may support asynchronous clock for the bus interface and SDRAM control logic
+
+3. **SDRAM CLK Phase Shift/Delay Consideration**
+    - SDRAM signals (control, address, data) are expected to be latched by the SDRAM chip near the end of the clock cycle. This provides more robust timing.
+    - However, it requires the SDRAM clock to be phase-shifted relative to the system clock to align correctly with the board layout and trace delay.
+    - Example: in Terasic DE2/DE2-115 FPGA board, the phase delay between SDRAM_CLK and system clock is -3ns. ([Reference 2/3](#reference))
+
+## FPGA Test
+
+The SDRAM controller has been implemented and tested on Altera FPGA development boards: DE2 and DE2-115.
+
+**Altera Virtual JTAG Host Interface**
+
+A **VJTAG Host* is connected to the SDRAM controller in the FPGA. The host PC sends read/write command the SDRAM controller through the VJTAG Host.
+
+> The Virtual JTAG Host is implemented in another repo: [virtual-jtag-host](https://github.com/feipenghhq/virtual-jtag-host). More details can be found there.
+
+**Test Scripts**
+
+Two tests are provided:
+- **access_test**: Performs sequential memory access within a specified range.
+- **random_test**: Performs randomized read/write tests to verify data integrity.
+If you have the above FPGA board, you can test it in the board. Here are the commands
+
+**How to run**
+
+If you have a supported FPGA board (DE2 or DE2-115), you can run the SDRAM test as follows:
+
+```sh
+cd fpga/de2     # or cd fpga/de2-115
+make pgm        # Build the FPGA image and program the FPGA board
+
+cd scripts/sdram_test
+./sdram_test.sh # Run SDRAM functional test via VJTAG
+```
+
+> Note:
+> - DE2 (Cyclone II) requires Quartus 13.0sp1
+> - DE2-115 (Cyclone IV) requires a newer version of Quartus
 
 
-
-#### SDRAM Interface
-
-| Name            | Type  | Width | Function                                                                                                                                 |
-| --------------- | ----- | ----- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| sdram_clk       | Input | 1     | Master Clock. Other input signals are clock at CLK rising edge.                                                                          |
-| sdram_cke       | Input | 1     | Clock Enable. CKE is high active.                                                                                                        |
-| sdram_cs_n      | Input | 1     | Chip Select: CSn enable and disables command decoder.                                                                                    |
-| sdram_ras_n     | Input | 1     | Row Address Select.                                                                                                                      |
-| sdram_cas_n     | Input | 1     | Column Address Select.                                                                                                                   |
-| sdram_we_n      | Input | 1     | Write Enable.                                                                                                                            |
-| sdram_addr      | Input | AW    | Address Inputs. Provide the row address for `ACTIVT` commands and the column address and `AUTO PRECHARGE` bit for `READ/WRITE` commands. |
-| sdram_ba0/ba1   | Input | 1     | Bank Address Inputs. BA0 and BA1 define to which bank a command is applied.                                                              |
-| sdram_dqm       | Input | 1     |                                                                                                                                          |
-| sdram_udqm/ldqm | Input | 1     |                                                                                                                                          |
-| sdram_dq        | Input | DW    | Data Input/Output bus                                                                                                                    |
-
-### State Diagram
 
 ## Reference
 
-1. [AHB-Lite Specification](http://eecs.umich.edu/courses/eecs373/readings/ARM_IHI0033A_AMBA_AHB-Lite_SPEC.pdf)
+1. [Micron MT48LC8M16A2 Datasheet](./doc/datasheets/Micron_Technology_128mb_x4x8x16_sdram-3473246.pdf)
+2. [Using the SDRAM on Altera’s DE2 Board with Verilog Designs](https://people.ece.cornell.edu/land/courses/ece5760/DE2/tut_DE2_sdram_verilog.pdf)
+3. [Using the SDRAM on Intel’s DE2-115 Board with Verilog Designs](https://ftp.intel.com/Public/Pub/fpgaup/pub/Teaching_Materials/current/Tutorials/Verilog/DE2-115/Using_the_SDRAM.pdf)
