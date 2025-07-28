@@ -7,7 +7,7 @@
 # Date Created: 07/18/2025
 #
 # -------------------------------------------------------------------
-# Basic SDRAM test
+# Random Read/Write test
 # -------------------------------------------------------------------
 
 import random
@@ -18,7 +18,7 @@ from cocotb.clock import Clock
 from env import *
 from bus import *
 
-async def test_random_read_write(dut, cl=2, num_op=10, num_seq=10):
+async def test_random_read_write(dut, num_op=10, num_seq=10):
     """
     Test Random read and write. Will issue write first and then read from the location
 
@@ -30,6 +30,9 @@ async def test_random_read_write(dut, cl=2, num_op=10, num_seq=10):
     valid_idx = []      # List of index to addr_data. Indicate the location that has valid data
     test_sequence = []  # List of (op, addr_data_index), op: 0 - write, 1 - read
     read_cnt = 0
+
+    # calculate cl from clock frequency
+    cl = 3 if (clk_freq >= 100) else 2
 
     # generate random address and data
     for i in range(num_seq):
@@ -59,6 +62,9 @@ async def test_random_read_write(dut, cl=2, num_op=10, num_seq=10):
             expected.append(data)
             read_cnt += 1
 
+    dut._log.info(f"Running Random test. Number of operation {hex(num_op)}. Number of location {hex(num_seq)}")
+    reporter = Reporter(dut._log, "Progress", num_op)
+
     # cocotb test sequence
     rc = 0
     wc = 0
@@ -75,6 +81,7 @@ async def test_random_read_write(dut, cl=2, num_op=10, num_seq=10):
             addr, data = addr_data[idx]
             await bus_write(dut, addr, data, 0x3)
             wc += 1
+        reporter.report_progress(1)
     await Timer(1, units='us')
     dut._log.info(f"Completed all the Operations!")
     await read_monitor
