@@ -307,7 +307,7 @@ assign arc_RESET_to_INIT = s_RESET;
 assign arc_INIT_to_IDLE = s_INIT & (init_state == INIT_DONE);
 
 // IDLE -> ROW_ACTIVE: Get a new bus request
-assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & int_bus_req & ~ir_cnt_zero; // FIXME: 1. IDLE takes 2 clock
+assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & int_bus_req & ~ir_cnt_zero;
 
 // IDLE -> AUTO_REFRESH
 assign arc_IDLE_to_AUTO_REFRESH = s_IDLE & ir_cnt_zero;
@@ -586,7 +586,6 @@ always_comb begin
         SDRAM_WRITE_A: begin
             // Set the bus_ready at the end of WRITE_A state so we can register the input when we enter IDLE state
             // and start to process the new request. This save one clock cycle if there are request pending.
-            // TBD: provide a Timing diagram in document
             int_bus_ready = cmd_cpl_pre;
         end
 

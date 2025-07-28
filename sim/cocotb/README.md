@@ -36,11 +36,15 @@ make clean && make FREQ=50
 make clean && make FREQ=100
 make clean && make FREQ=133
 
-# Run random_rw with different clock frequency
+# Run random_rw test with different clock frequency
 make clean && make MODULE=test_random_rw FREQ=50
 make clean && make MODULE=test_random_rw FREQ=100
 make clean && make MODULE=test_random_rw FREQ=133
 
+# Run manual_precharge test with different clock frequency
+make clean && make MODULE=test_manual_precharge FREQ=50
+make clean && make MODULE=test_manual_precharge FREQ=100
+make clean && make MODULE=test_manual_precharge FREQ=133
 
 # Run regression with different clock frequency
 make clean && make MODULE=test_regression FREQ=50

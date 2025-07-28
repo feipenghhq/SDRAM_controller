@@ -20,7 +20,7 @@
 
 `default_nettype none
 
-module sdram_controller #(
+module sdram_simple_mp #(
     parameter CLK_FREQ = 100,   // (MHz) clock frequency
     parameter AW = 24,          // Bus Address width. Should match with SDRAM size
     parameter DW = 16,          // Bus Data width
