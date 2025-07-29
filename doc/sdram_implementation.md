@@ -22,6 +22,9 @@
     - [Supported Feature](#supported-feature)
     - [Main State Machine](#main-state-machine)
     - [Implementation Note](#implementation-note)
+  - [Design Variants: sdram\_simple\_mp.sv](#design-variants-sdram_simple_mpsv)
+    - [Supported Feature](#supported-feature-1)
+    - [Main State Machine](#main-state-machine-1)
 
 ## Introduction
 
@@ -325,7 +328,6 @@ This state machine manages the control flow of SDRAM operations, including initi
 **States and Transitions**
 
 - RESET
-
   - Entered when the system is reset.
   - Transitions to INIT upon de-assertion of reset (rst_n).
 
@@ -334,34 +336,28 @@ This state machine manages the control flow of SDRAM operations, including initi
   - Transitions to IDLE when the internal init state (init_state) reaches INIT_DONE.
 
 - IDLE
-
   - Waits for a bus request or refresh trigger.
   - Transitions to:
     - AUTO_REFRESH if `ir_cnt_zero` is asserted (refresh interval reached).
     - ROW_ACTIVE if a bus request is pending (`int_bus_req`) and `ir_cnt_zero` is de-asserted (i.e., not in refresh period).
 
 - AUTO_REFRESH
-
   - Issues a REFRESH command to the SDRAM.
   - Returns to IDLE once the command completes (`cRFC`).
 
 - ROW_ACTIVE
-
   - Issues a ROW ACTIVE command to activates the appropriate SDRAM row for read/write access.
   - Transitions to:
     - READ_A if the request is a read (`int_bus_read`).
     - WRITE_A if the request is a write (`int_bus_write`).
   - Transitions after the Row Active command complete (`cRCD`).
 
-
 - READ_A
-
   - Issue READ with Auto Precharge command.
   - Returns to IDLE after the command completes (`cRC - cRCD`).
   - tRC count from ROW ACTIVE to Auto Precharge complete, so the time spend in READ with Auto Precharge command is `tRC - tRCD`
 
 - WRITE_A
-
   - Issue WRITE with Auto Precharge command.
   - Returns to IDLE after the command completes (`cRC - cRCD`).
 
@@ -390,4 +386,83 @@ Example Waveform:
 - E: `int_bus_ready` is asserted one cycle before the `READ_A` command complete.
 - F: `bus_ready` is asserted at the last cycle of `READ_A`.
 
-Note: The IDLE state can further be optimized away here.
+## Design Variants: sdram_simple_mp.sv
+
+This section describe implementation for sdram_simple_mp.sv variant.
+
+### Supported Feature
+
+- Single read/write. No burst support.
+- **Manual precharge.**
+
+### Main State Machine
+
+#### State Definition in RTL
+
+```verilog
+typedef enum logic [3:0] {
+    SDRAM_RESET,              // Start up State
+    SDRAM_INIT,               // SDRAM initialization
+    SDRAM_MODE_REG_SET,       // Mode Register set
+    SDRAM_IDLE,               // IDLE state (after bank have been pre-charged)
+    SDRAM_ROW_ACTIVE,         // Active a row
+    SDRAM_WRITE,              // Write without auto precharge
+    SDRAM_READ,               // Read without auto precharge
+    SDRAM_PRECHARGE,          // Precharge the bank
+    SDRAM_AUTO_REFRESH        // Auto Refresh
+} sdram_state_t;
+```
+
+**State Transition Diagram**
+
+![Simple AP State Machine](./state_machine/sdram_simple_mp_state_machine.drawio.png)
+
+
+**States and Transitions**
+
+- RESET
+  - Entered when the system is reset.
+  - Transitions to INIT upon de-assertion of reset (rst_n).
+
+- INIT
+  - Performs SDRAM initialization sequence.
+  - Transitions to IDLE when the internal init state (init_state) reaches INIT_DONE.
+
+- IDLE
+  - Waits for a bus request or refresh trigger.
+  - Transitions to:
+    - ROW_ACTIVE: `Not refresh pending` AND `New request registered` AND `Bank precharged`.
+    - WRITE:      `Not refresh pending` AND `New write request registered` AND `No need to open a new row`.
+    - READ:       `Not refresh pending` AND `New read  request registered` AND `No need to open a new row`.
+    - AUTO_REFRESH: `refresh pending` OR (`new bus request registered` AND `Need to open a new row`)
+
+- ROW_ACTIVE
+  - Issues a ROW ACTIVE command to activates the appropriate SDRAM row for read/write access.
+  - Transitions to:
+    - READ:  `Row Active command complete (tRCD)` AND `Read request registered`.
+    - WRITE: `Row Active command complete (tRCD)` AND `Write request registered`.
+
+- AUTO_REFRESH
+  - Issues a REFRESH command to the SDRAM.
+  - Transitions to:
+    - IDLE: `Auto Refresh command complete (tRFC)` AND `No request registered`.
+    - ROW_ACTIVE: `Auto Refresh command complete (tRFC)` AND `New request registered`.
+
+- PRECHARGE
+  - Issues a REFRESH command to the SDRAM.
+  - Transitions to:
+    - AUTO_REFRESH: `Precharge command complete (tRP)` AND `Refresh pending`.
+    - ROW_ACTIVE: `Precharge command complete (tRP)` AND `Not refresh pending`.
+
+- READ_A
+  - Issue READ command.
+  - Transitions to:
+    - IDLE: `Read command complete (RL+1).`
+
+- WRITE_A
+  - Issue WRITE command.
+  - Transitions to:
+    - IDLE: `Write command complete (tWR).`
+
+Note:
+  - `open a new row` is defined as the current {bank, row} != previous {bank, row}
