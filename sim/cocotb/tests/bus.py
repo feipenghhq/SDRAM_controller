@@ -16,13 +16,13 @@ def bus_init(dut):
     """
     Initialize the bus
     """
-    dut.bus_read.value      = 0
-    dut.bus_write.value     = 0
-    dut.bus_addr.value      = 0
-    dut.bus_burst.value     = 0
-    dut.bus_burst_len.value = 0
-    dut.bus_wdata.value     = 0
-    dut.bus_byteenable.value = 0
+    dut.bus_req_read.value      = 0
+    dut.bus_req_write.value     = 0
+    dut.bus_req_addr.value      = 0
+    dut.bus_req_burst.value     = 0
+    dut.bus_req_burst_len.value = 0
+    dut.bus_req_wdata.value     = 0
+    dut.bus_req_byteenable.value = 0
 
 async def bus_write(
     dut,
@@ -41,22 +41,22 @@ async def bus_write(
     """
     await FallingEdge(dut.clk)
     # Address phase
-    dut.bus_write.value      = 1
-    dut.bus_addr.value       = addr
-    dut.bus_wdata.value      = data
-    dut.bus_byteenable.value = byte_en
+    dut.bus_req_write.value      = 1
+    dut.bus_req_addr.value       = addr
+    dut.bus_req_wdata.value      = data
+    dut.bus_req_byteenable.value = byte_en
 
     await RisingEdge(dut.clk)
     # Wait for slave to be ready (optional depending on DUT)
-    while not dut.bus_ready.value:
+    while not dut.bus_req_ready.value:
         await RisingEdge(dut.clk)
 
     await FallingEdge(dut.clk)
     # Drive idle values after write address phase
-    dut.bus_write.value      = 0
-    dut.bus_addr.value       = 0
-    dut.bus_wdata.value      = 0
-    dut.bus_byteenable.value = 0
+    dut.bus_req_write.value      = 0
+    dut.bus_req_addr.value       = 0
+    dut.bus_req_wdata.value      = 0
+    dut.bus_req_byteenable.value = 0
 
 async def bus_read(
     dut,
@@ -73,20 +73,20 @@ async def bus_read(
     """
     await FallingEdge(dut.clk)
     # Address phase
-    dut.bus_read.value       = 1
-    dut.bus_addr.value       = addr
-    dut.bus_byteenable.value = byte_en
+    dut.bus_req_read.value       = 1
+    dut.bus_req_addr.value       = addr
+    dut.bus_req_byteenable.value = byte_en
 
     await RisingEdge(dut.clk)
     # Wait for slave to be ready (optional depending on DUT)
-    while not dut.bus_ready.value:
+    while not dut.bus_req_ready.value:
         await RisingEdge(dut.clk)
 
     await FallingEdge(dut.clk)
     # Drive idle values after write address phase
-    dut.bus_read.value       = 0
-    dut.bus_addr.value       = 0
-    dut.bus_byteenable.value = 0
+    dut.bus_req_read.value       = 0
+    dut.bus_req_addr.value       = 0
+    dut.bus_req_byteenable.value = 0
 
 async def bus_read_response(dut, expected=None, debug=False):
     """
@@ -99,9 +99,9 @@ async def bus_read_response(dut, expected=None, debug=False):
     i = 0
     if expected:
         for exp_data in expected:
-            await RisingEdge(dut.bus_rvalid)
+            await RisingEdge(dut.bus_rsp_valid)
             await FallingEdge(dut.clk)
-            data = dut.bus_rdata.value.integer
+            data = dut.bus_rsp_rdata.value.integer
             assert data == exp_data, dut._log.error(f"[BUS READ] Wrong read data. Expected: {exp_data}. Actual: {data}")
             i += 1
             if debug:
@@ -109,6 +109,6 @@ async def bus_read_response(dut, expected=None, debug=False):
         dut._log.info(f"[BUS READ] Read all expected data!!!")
         return
     else:
-        await RisingEdge(dut.bus_rvalid)
+        await RisingEdge(dut.bus_rsp_valid)
         await FallingEdge(dut.clk)
-        return dut.bus_rdata.value
+        return dut.bus_rsp_rdata.value

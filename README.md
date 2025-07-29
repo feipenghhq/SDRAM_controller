@@ -65,6 +65,52 @@ A high-performance SDRAM controller designed to interface with standard SDRAM ch
 
 The timing can usually be found in the SDRAM Datasheet
 
+## SDRAM Bus Interface
+
+The SDRAM controller use a custom bus interface. It is divided into 2 channels: request channel and response channel.
+
+### Outstanding Transaction
+
+With 2 channel architecture, the sdram support outstanding or pipelined transaction.
+
+Parameter `MAX_OUTSTANDING` is added to indicate the maximum outstanding transaction it support.
+
+If `MAX_OUTSTANDING` is not defined:
+- The design does not support outstanding feature.
+- Current transaction must complete before the next transaction is issued.
+
+If `MAX_OUTSTANDING` is defined:
+- the value to indicate the maximum outstanding transaction the system supports/requires.
+
+### Interface
+
+#### Request Channel
+
+| Signal Name          | Direction | Description                                                |
+| -------------------- | --------- | ---------------------------------------------------------- |
+| `bus_req_read`       | Input     | Assert to initiate a read request                          |
+| `bus_req_write`      | Input     | Assert to initiate a write request                         |
+| `bus_req_addr`       | Input     | Byte address of the access                                 |
+| `bus_req_burst`      | Input     | High if the request is a burst. Only asserts on first req. |
+| `bus_req_burst_len`  | Input     | Burst length (number of beats).                            |
+| `bus_req_wdata`      | Input     | Write data for the memory write                            |
+| `bus_req_byteenable` | Input     | Byte enable mask for partial writes                        |
+| `bus_req_ready`      | Output    | High when controller is ready                              |
+
+Note on burst:
+  - `bus_req_burst` only asserts on the first beat of the burst request.
+  - `bus_req_burst_len` indicate the burst length and is valid when `bus_req_burst` is asserted.
+    the burst length.
+  - For read request, only one request is issued.
+  - For write request, the subsequence request will provide the next write data and next address. The address needs to
+    match with burst sequence
+
+#### Response Channel
+| Signal Name     | Direction | Description                 |
+| --------------- | --------- | --------------------------- |
+| `bus_rsp_valid` | Output    | Indicate read data is valid |
+| `bus_rsp_rdata` | Output    | Read data                   |
+
 ## Implementation
 
 ### SDRAM Controller Variants

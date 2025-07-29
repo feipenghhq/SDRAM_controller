@@ -25,16 +25,16 @@ module sdram_MT48LC8M16A2 #(
     input  logic            clk,
     input  logic            rst_n,
     // System Bus
-    input  logic            bus_read,
-    input  logic            bus_write,
-    input  logic [AW-1:0]   bus_addr,
-    input  logic            bus_burst,
-    input  logic [2:0]      bus_burst_len,
-    input  logic [DW-1:0]   bus_wdata,
-    input  logic [1:0]      bus_byteenable,
-    output logic            bus_ready,
-    output logic            bus_rvalid,
-    output logic [DW-1:0]   bus_rdata,
+    input  logic            bus_req_read,
+    input  logic            bus_req_write,
+    input  logic [AW-1:0]   bus_req_addr,
+    input  logic            bus_req_burst,
+    input  logic [2:0]      bus_req_burst_len,
+    input  logic [DW-1:0]   bus_req_wdata,
+    input  logic [1:0]      bus_req_byteenable,
+    output logic            bus_req_ready,
+    output logic            bus_rsp_valid,
+    output logic [DW-1:0]   bus_rsp_rdata,
     // SDRAM Config
     input  logic [2:0]      cfg_burst_length,       // SDRAM Mode register: Burst Length
     input  logic            cfg_burst_type,         // SDRAM Mode register: Burst Type

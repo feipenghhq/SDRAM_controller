@@ -31,17 +31,17 @@ module tb_top;
     logic [2:0]     cfg_cas_latency;
     logic           cfg_burst_mode;
 
-    // System Bus
-    logic           bus_read;
-    logic           bus_write;
-    logic [AW-1:0]  bus_addr;
-    logic           bus_burst;
-    logic [2:0]     bus_burst_len;
-    logic [DW-1:0]  bus_wdata;
-    logic [1:0]     bus_byteenable;
-    logic           bus_ready;
-    logic           bus_rvalid;
-    logic [DW-1:0]  bus_rdata;
+    // System bus_req
+    logic           bus_req_read;
+    logic           bus_req_write;
+    logic [AW-1:0]  bus_req_addr;
+    logic           bus_req_burst;
+    logic [2:0]     bus_req_burst_len;
+    logic [DW-1:0]  bus_req_wdata;
+    logic [1:0]     bus_req_byteenable;
+    logic           bus_req_ready;
+    logic           bus_rsp_valid;
+    logic [DW-1:0]  bus_rsp_rdata;
 
     // SDRAM interface wires
     logic           sdram_clk;

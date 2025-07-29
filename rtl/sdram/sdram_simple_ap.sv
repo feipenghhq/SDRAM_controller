@@ -13,10 +13,13 @@
 //     1. Single Read/Write access with Auto-precharge
 //
 // SDRAM Controller Features:
-//     1. bus input and output are registered for better timing
+//     1. Input/Output register
+//     2. Not support outstanding transaction. Previous must complete
+//        before issuing next transaction
 //
 // -------------------------------------------------------------------
 
+`default_nettype none
 
 module sdram_simple_ap #(
     parameter CLK_FREQ = 100,   // (MHz) clock frequency
@@ -39,16 +42,17 @@ module sdram_simple_ap #(
     input  logic            rst_n,
 
     // System Bus
-    input  logic            bus_read,               // read request
-    input  logic            bus_write,              // write request
-    input  logic [AW-1:0]   bus_addr,               // address
-    input  logic            bus_burst,              // indicate burst transfer
-    input  logic [2:0]      bus_burst_len,          // Burst length
-    input  logic [DW-1:0]   bus_wdata,              // write data
-    input  logic [DW/8-1:0] bus_byteenable,         // byte enable
-    output logic            bus_ready,              // ready
-    output logic            bus_rvalid,             // read data valid
-    output logic [DW-1:0]   bus_rdata,              // read data
+    input  logic            bus_req_read,            // read request
+    input  logic            bus_req_write,           // write request
+    input  logic [AW-1:0]   bus_req_addr,            // address
+    input  logic            bus_req_burst,           // indicate burst transfer
+    input  logic [2:0]      bus_req_burst_len,       // Burst length
+    input  logic [DW-1:0]   bus_req_wdata,           // write data
+    input  logic [DW/8-1:0] bus_req_byteenable,      // byte enable
+    output logic            bus_req_ready,           // ready
+
+    output logic            bus_rsp_valid,           // read data valid
+    output logic [DW-1:0]   bus_rsp_rdata,           // read data
 
     // SDRAM Config
     input  logic [2:0]      cfg_burst_length,       // SDRAM Mode register: Burst Length
@@ -66,7 +70,6 @@ module sdram_simple_ap #(
     output logic [1:0]      sdram_ba,               // Bank.
     output logic [DW/8-1:0] sdram_dqm,              // Data Mask
     inout  wire  [DW-1:0]   sdram_dq                // Data Input/Output bus.
-
 );
 
 /////////////////////////////////////////////////
@@ -74,16 +77,15 @@ module sdram_simple_ap #(
 /////////////////////////////////////////////////
 
 // Other SDRAM parameter
-parameter cMRD = 3;             // (cycle) LOAD MODE REGISTER command to ACTIVE or REFRESH command. JEDEC specify 3 clocks.
-parameter INIT_TIME = 100;      // (us) initialization NOP time
-parameter ROW_COUNT = 2**RAW;   // SDRAM row count
+localparam cMRD = 3;             // (cycle) LOAD MODE REGISTER command to ACTIVE or REFRESH command. JEDEC specify 3 clocks.
+localparam INIT_TIME = 100;      // (us) initialization NOP time
+localparam ROW_COUNT = 2**RAW;   // SDRAM row count
 
 /////////////////////////////////////////////////
 // Local Parameter
 /////////////////////////////////////////////////
 
 // Calculate the SDRAM timing in terms of number of clock cycle
-/* verilator lint_off UNUSEDPARAM */
 localparam cRAS = ceil_div(tRAS * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE-to-PRECHARGE command
 localparam cRC  = ceil_div(tRC  * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE-to-ACTIVE command period
 localparam cRCD = ceil_div(tRCD * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE-to-READ or WRITE delay
@@ -91,7 +93,6 @@ localparam cRFC = ceil_div(tRFC * CLK_FREQ, 1000);      // (CLK Cycle) AUTO REFR
 localparam cRP  = ceil_div(tRP  * CLK_FREQ, 1000);      // (CLK Cycle) PRECHARGE command period
 localparam cRRD = ceil_div(tRRD * CLK_FREQ, 1000);      // (CLK Cycle) ACTIVE bank a to ACTIVE bank b command
 localparam cWR  = ceil_div(tWR  * CLK_FREQ, 1000);      // (CLK Cycle) WRITE recovery time (WRITE completion to PRECHARGE period)
-/* verilator lint_on UNUSEDPARAM */
 
 // Bus Decode
 localparam NUM_BYTE      = DW / 8;                      // Number of byte
@@ -174,19 +175,15 @@ sdram_init_state_t          init_state, init_state_n;
 // Internal system bus, these are registered version of the system bus
 logic                       int_bus_read;
 logic                       int_bus_write;
-/* verilator lint_off UNUSEDSIGNAL */
 logic [AW-1:0]              int_bus_addr;
-logic                       int_bus_burst;
-logic [2:0]                 int_bus_burst_len;
-/* verilator lint_on UNUSEDSIGNAL */
 logic [DW-1:0]              int_bus_wdata;
 logic [DW/8-1:0]            int_bus_byteenable;
 logic                       int_bus_ready;
-logic                       int_bus_rvalid;
-logic [DW-1:0]              int_bus_rdata;
+logic                       int_bus_rsp_valid;
+logic [DW-1:0]              int_bus_rsp_rdata;
 
 logic                       bus_req;            // new bus request
-logic                       int_bus_req;        // internal bus request
+logic                       int_bus;        // internal bus request
 
 // Address mapping to sdram {bank, row, col}
 logic [1:0]                 bank;               // band address
@@ -210,7 +207,8 @@ logic [DW-1:0]              sdram_dqo;          // registered version of int_sdr
 
 // initialization and refresh counter
 logic [INIT_CNT_WIDTH-1:0]  ir_cnt;
-logic                       ir_cnt_zero;        // counter reach zero
+logic                       ir_cpl;        // counter reach zero
+
 
 // command counter and cmd indicator
 logic [CMD_CNT_WIDTH-1:0]   cmd_cnt;
@@ -237,9 +235,9 @@ logic                       wait_rdata;         // read request issue, waiting f
 // ----------------------------------------------
 
 // a new bus request is taken
-assign bus_req = (bus_read | bus_write) & bus_ready;
+assign bus_req = (bus_req_read | bus_req_write) & bus_req_ready;
 
-assign int_bus_req = int_bus_read | int_bus_write;
+assign int_bus = int_bus_read | int_bus_write;
 
 // Register input
 always_ff @(posedge clk) begin
@@ -249,8 +247,8 @@ always_ff @(posedge clk) begin
     end
     else begin
         if (bus_req) begin
-            int_bus_read   <= bus_read;
-            int_bus_write  <= bus_write;
+            int_bus_read   <= bus_req_read;
+            int_bus_write  <= bus_req_write;
         end
         else if (int_bus_ready) begin
             int_bus_read   <= 1'b0;
@@ -261,28 +259,26 @@ end
 
 always_ff @(posedge clk) begin
     if (bus_req) begin
-        int_bus_addr       <= bus_addr;
-        int_bus_burst      <= bus_burst;
-        int_bus_burst_len  <= bus_burst_len;
-        int_bus_wdata      <= bus_wdata;
-        int_bus_byteenable <= bus_byteenable;
+        int_bus_addr       <= bus_req_addr;
+        int_bus_wdata      <= bus_req_wdata;
+        int_bus_byteenable <= bus_req_byteenable;
     end
 end
 
 // Register bus output
 always_ff @(posedge clk) begin
     if (!rst_n) begin
-        bus_ready  <= 1'b0;
-        bus_rvalid <= 1'b0;
+        bus_req_ready  <= 1'b0;
+        bus_rsp_valid <= 1'b0;
     end
     else begin
-        bus_ready  <= int_bus_ready;
-        bus_rvalid <= int_bus_rvalid;
+        bus_req_ready  <= int_bus_ready;
+        bus_rsp_valid <= int_bus_rsp_valid;
     end
 end
 
 always_ff @(posedge clk) begin
-   bus_rdata <= int_bus_rdata;
+   bus_rsp_rdata <= int_bus_rsp_rdata;
 end
 
 // ----------------------------------------------
@@ -307,10 +303,10 @@ assign arc_RESET_to_INIT = s_RESET;
 assign arc_INIT_to_IDLE = s_INIT & (init_state == INIT_DONE);
 
 // IDLE -> ROW_ACTIVE: Get a new bus request
-assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & int_bus_req & ~ir_cnt_zero;
+assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & int_bus & ~ir_cpl;
 
 // IDLE -> AUTO_REFRESH
-assign arc_IDLE_to_AUTO_REFRESH = s_IDLE & ir_cnt_zero;
+assign arc_IDLE_to_AUTO_REFRESH = s_IDLE & ir_cpl;
 
 // ROW ACTIVE -> WRITE_A
 assign arc_ROW_ACTIVE_to_WRITE_A = s_ROW_ACTIVE & cmd_cpl & int_bus_write;
@@ -325,10 +321,10 @@ assign arc_WRITE_A_to_IDLE = s_WRITE_A & cmd_cpl;
 assign arc_READ_A_to_IDLE = s_READ_A & cmd_cpl;
 
 // AUTO_REFRESH -> IDLE: Complete the auto refresh operation and no request pending
-assign arc_AUTO_REFRESH_to_IDLE = s_AUTO_REFRESH & cmd_cpl & ~int_bus_req;
+assign arc_AUTO_REFRESH_to_IDLE = s_AUTO_REFRESH & cmd_cpl & ~int_bus;
 
 // AUTO_REFRESH -> IDLE: Complete the auto refresh operation and request pending
-assign arc_AUTO_REFRESH_to_ROW_ACTIVE = s_AUTO_REFRESH & cmd_cpl & int_bus_req;
+assign arc_AUTO_REFRESH_to_ROW_ACTIVE = s_AUTO_REFRESH & cmd_cpl & int_bus;
 
 // state transition
 always_ff @(posedge clk) begin
@@ -377,7 +373,7 @@ always_comb begin
             if (arc_RESET_to_INIT) init_state_n = INIT_WAIT;
         end
         INIT_WAIT: begin
-            if (ir_cnt_zero) init_state_n = INIT_PRECHARGE;
+            if (ir_cpl) init_state_n = INIT_PRECHARGE;
         end
         INIT_PRECHARGE: begin
             if (cmd_cpl) init_state_n = INIT_AUTO_REF0;
@@ -413,7 +409,7 @@ always_ff @(posedge clk) begin
     end
 end
 
-assign ir_cnt_zero = ir_cnt == 0;
+assign ir_cpl = ir_cnt == 0;
 
 // ----------------------------------------------
 // cmd counter
@@ -468,8 +464,8 @@ end
 // Decode the bus address to sdram bank, row, col
 assign {bank, row, col} = int_bus_addr[AW-1:BW];
 
-assign int_bus_rvalid   = wait_rdata & (read_latency_cnt == 0);
-assign int_bus_rdata    = sdram_dq;
+assign int_bus_rsp_valid   = wait_rdata & (read_latency_cnt == 0);
+assign int_bus_rsp_rdata   = sdram_dq;
 
 always_comb begin
 
@@ -489,28 +485,22 @@ always_comb begin
     cmd_is_read_a    = 1'b0;
     cmd_is_precharge = 1'b0;
 
-    // disable bus_ready when we get a new request or then there are request already pending/in progress
-    int_bus_ready   = ~bus_req & ~int_bus_req;
+    // disable bus_req_ready when we get a new request or then there are request already pending/in progress
+    int_bus_ready   = ~bus_req & ~int_bus;
 
-    /* verilator lint_off CASEINCOMPLETE */
     case(sdram_state)
-    /* verilator lint_on CASEINCOMPLETE */
 
         SDRAM_INIT: begin
 
             int_bus_ready = 1'b0;   // not ready to take any request during initialization
 
-            /* verilator lint_off CASEINCOMPLETE */
             case(init_state)
-            /* verilator lint_on CASEINCOMPLETE */
-
                 INIT_IDLE: begin
                     if (arc_RESET_to_INIT) sdram_ctrl(CMD_DESL);
                 end
                 INIT_WAIT: begin
                     sdram_ctrl(CMD_DESL);
-                    // going to INIT_PRECHARGE state: scheduling Precharge command
-                    if (ir_cnt_zero) begin
+                    if (ir_cpl) begin
                         sdram_ctrl(CMD_PRECHARGE);
                         cmd_is_precharge = 1'b1;
                         int_sdram_addr[10] = 1'b1;
@@ -542,6 +532,7 @@ always_comb begin
                         int_sdram_addr[9]   = cfg_burst_mode;
                     end
                 end
+                default:  ;
             endcase
         end
 
@@ -584,7 +575,7 @@ always_comb begin
         end
 
         SDRAM_WRITE_A: begin
-            // Set the bus_ready at the end of WRITE_A state so we can register the input when we enter IDLE state
+            // Set the bus_req_ready at the end of WRITE_A state so we can register the input when we enter IDLE state
             // and start to process the new request. This save one clock cycle if there are request pending.
             int_bus_ready = cmd_cpl_pre;
         end
@@ -603,6 +594,7 @@ always_comb begin
                 int_sdram_addr = row;
             end
         end
+        default: ;
     endcase
 end
 
@@ -666,7 +658,6 @@ endtask
 
 // Assign the COL address
 // Consider the case when CAW > 10 since A[10] is used for auto precharge
-/* verilator lint_off SELRANGE */
 task automatic sdram_col_addr();
     if (CAW > 10) begin
         int_sdram_addr[9:0]        = col[9:0];
@@ -676,7 +667,6 @@ task automatic sdram_col_addr();
         int_sdram_addr[CAW-1:0] = col;
     end
 endtask
-/* verilator lint_on SELRANGE */
 
 /////////////////////////////////////////////////
 // SIMULATION
