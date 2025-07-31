@@ -63,7 +63,8 @@ module sdram_controller #(
     inout  wire  [DW-1:0]   sdram_dq                // Data Input/Output bus.
 );
 
-sdram_ctrl_auto_precharge #(
+//sdram_ctrl_auto_precharge #(
+sdram_ctrl_manual_precharge #(
      .CLK_FREQ (CLK_FREQ)
     ,.AW       (AW)
     ,.DW       (DW)
@@ -76,6 +77,7 @@ sdram_ctrl_auto_precharge #(
     ,.tRFC     (tRFC)
     ,.tRP      (tRP)
     ,.tRRD     (tRRD)
+    ,.BUS_MODE (0)
 ) u_sdram_ctrl (
     .*
 );

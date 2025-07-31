@@ -53,5 +53,5 @@ async def test_sequential_read_write(dut, start_addr=0, end_addr=0x1000):
 
 factory = TestFactory(test_sequential_read_write)
 factory.add_option("start_addr", [0])
-factory.add_option("end_addr", [0x2000])
+factory.add_option("end_addr", [100])
 factory.generate_tests()

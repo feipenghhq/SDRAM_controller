@@ -13,6 +13,7 @@ TOP ?= top
 # verilog source files
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_controller.sv
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_ctrl_auto_precharge.sv
+VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_ctrl_manual_precharge.sv
 VERILOG += $(GIT_ROOT)/rtl/chip/sdram_IS42S16400.sv
 VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_ctrl.sv
 VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_ip.v
