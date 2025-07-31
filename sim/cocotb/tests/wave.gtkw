@@ -1,17 +1,18 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Thu Jul 24 00:02:04 2025
+[*] Thu Jul 31 05:00:32 2025
 [*]
 [dumpfile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/tests/sim_build/tb_top.fst"
-[dumpfile_mtime] "Thu Jul 24 00:01:41 2025"
-[dumpfile_size] 71618
+[dumpfile_mtime] "Thu Jul 31 04:59:03 2025"
+[dumpfile_size] 121671
 [savefile] "/home/feipenghhq/Desktop/GITHUB/SDRAM_controller/sim/cocotb/tests/wave.gtkw"
-[timestart] 201996300
+[timestart] 0
 [size] 3370 1243
 [pos] -1 -1
-*-15.000000 202375001 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-24.000000 202375001 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb_top.
 [treeopen] tb_top.dut.
+[treeopen] tb_top.dut.u_sdram_controller.
 [sst_width] 315
 [signals_width] 420
 [sst_expanded] 1
@@ -23,22 +24,19 @@ tb_top.clk
 -
 -BUS
 @28
-tb_top.dut.bus_read
-tb_top.dut.bus_write
-tb_top.dut.u_sdram_controller.bus_ready
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_req_read
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_req_write
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_req_ready
 @22
-tb_top.dut.bus_addr[23:0]
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_req_addr[23:0]
 @28
-tb_top.dut.bus_burst
-tb_top.dut.bus_burst_len[2:0]
-tb_top.dut.bus_byteenable[1:0]
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_req_byteenable[1:0]
 @22
-tb_top.dut.bus_wdata[15:0]
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_req_wdata[15:0]
 @28
-tb_top.dut.bus_read
-tb_top.dut.bus_rvalid
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_rsp_valid
 @22
-tb_top.dut.bus_rdata[15:0]
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.bus_rsp_rdata[15:0]
 @200
 -
 -SDRAM
@@ -75,14 +73,11 @@ tb_top.sdram_dq[15:0]
 -
 -INTERNAL
 @820
-tb_top.dut.u_sdram_controller.sdram_state_str[95:0]
+tb_top.dut.u_sdram_controller.u_sdram_ctrl.sdram_state_str[95:0]
 @200
 -
 -SDRAM
 @28
 tb_top.sdram_model.Sys_clk
-tb_top.dut.u_sdram_controller.int_bus_read
-tb_top.dut.u_sdram_controller.int_bus_write
-tb_top.dut.u_sdram_controller.read_latency[2:0]
 [pattern_trace] 1
 [pattern_trace] 0

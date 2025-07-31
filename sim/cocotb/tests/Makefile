@@ -29,3 +29,6 @@ include $(shell cocotb-config --makefiles)/Makefile.sim
 
 lint:
 	verilator --lint-only -Wall $(RTL_SOURCES) --top-module sdram_controller
+
+wave:
+	gtkwave sim_build/tb_top.fst wave.gtkw &

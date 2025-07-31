@@ -39,7 +39,6 @@ async def bus_write(
     - data: Write data (int)
     - byte_en: Byte enable
     """
-    await FallingEdge(dut.clk)
     # Address phase
     dut.bus_req_write.value      = 1
     dut.bus_req_addr.value       = addr
@@ -71,7 +70,6 @@ async def bus_read(
     - addr: Read address (int)
     - byte_en: Byte enable
     """
-    await FallingEdge(dut.clk)
     # Address phase
     dut.bus_req_read.value       = 1
     dut.bus_req_addr.value       = addr
