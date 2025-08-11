@@ -17,7 +17,7 @@
 `define CLK_FREQ 133
 `endif
 
-module tb_sdram_controller;
+module tb_wbsdram;
     parameter DW = 16;
     parameter AW = 24;
 
@@ -31,17 +31,16 @@ module tb_sdram_controller;
     logic [2:0]     cfg_cas_latency;
     logic           cfg_burst_mode;
 
-    // System bus_req
-    logic           bus_req_valid;
-    logic           bus_req_write;
-    logic [AW-1:0]  bus_req_addr;
-    logic [DW-1:0]  bus_req_wdata;
-    logic [1:0]     bus_req_byteenable;
-    logic           bus_req_ready;
-
-    logic           bus_rsp_early_valid;
-    logic           bus_rsp_valid;
-    logic [DW-1:0]  bus_rsp_rdata;
+    // Wishbone bus
+    logic [DW-1:0]   wb_dat_i;
+    logic [DW-1:0]   wb_dat_o;
+    logic            wb_cyc_i;
+    logic            wb_stb_i;
+    logic            wb_we_i;
+    logic [AW-1:0]   wb_adr_i;
+    logic [DW/8-1:0] wb_sel_i;
+    logic            wb_ack_o;
+    logic            wb_stall_o;
 
     // SDRAM interface wires
     logic           sdram_clk;
@@ -60,7 +59,7 @@ module tb_sdram_controller;
 
     always_comb sdram_clk <= #CLK_DELAY clk;
 
-    sdram_controller #(.CLK_FREQ(`CLK_FREQ))
+    wbsdram #(.CLK_FREQ(`CLK_FREQ))
     dut (
         .*
     );

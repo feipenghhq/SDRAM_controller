@@ -13,12 +13,14 @@
 import cocotb
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.clock import Clock
+
 from bus import *
+from WbHostBFM import *
+
 import os
 
 clk_freq = int(os.environ.get("FREQ", 50))
-clk_period = round(1000.0 / clk_freq)
-clk_period = round(clk_period, 2)
+clk_period = round(1000.0 / clk_freq, 1)
 
 def load_config(dut, burst_len=0, burst_type=0, cas=2, write_burst_mode=0):
     """
@@ -29,13 +31,18 @@ def load_config(dut, burst_len=0, burst_type=0, cas=2, write_burst_mode=0):
     dut.cfg_cas_latency.value   = cas
     dut.cfg_burst_mode.value    = write_burst_mode
 
-async def init(dut, period = 10, debug_model=False):
+async def init(dut, period=10.0, debug_model=False, bus='default'):
     """
     Initialize the environment: setup clock, load the hack rom and reset the design
     """
-    bus_init(dut)
+    _bus = None
+    if bus == 'default':
+        bus_init(dut)
+    elif bus == 'wishbone':
+        _bus = WbHostBFM(dut)
     # start clock
     cocotb.start_soon(Clock(dut.clk, period, units = 'ns').start()) # clock
+    dut._log.info(f"Clock period is {period}")
     # generate reset
     dut.rst_n.value = 0
     await Timer(period * 5, units="ns")
@@ -43,6 +50,7 @@ async def init(dut, period = 10, debug_model=False):
     await RisingEdge(dut.clk)
     if not debug_model:
         dut.sdram_model.Debug.value = 0
+    return _bus
 
 step_val = 0
 total_val = 0

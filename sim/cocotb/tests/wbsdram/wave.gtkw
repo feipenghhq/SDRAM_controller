@@ -1,0 +1,96 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Mon Aug 11 05:15:50 2025
+[*]
+[dumpfile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/wbsdram/sim_build/tb_wbsdram.fst"
+[dumpfile_mtime] "Mon Aug 11 05:15:14 2025"
+[dumpfile_size] 83706
+[savefile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/wbsdram/wave.gtkw"
+[timestart] 0
+[size] 3370 1243
+[pos] -1 -1
+*-25.000000 202625400 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb_wbsdram.
+[treeopen] tb_wbsdram.dut.
+[sst_width] 388
+[signals_width] 420
+[sst_expanded] 1
+[sst_vpaned_height] 253
+@28
+tb_wbsdram.rst_n
+tb_wbsdram.clk
+@200
+-
+-WB_BUS
+@28
+tb_wbsdram.dut.wb_cyc_i
+tb_wbsdram.dut.wb_stb_i
+tb_wbsdram.dut.wb_we_i
+tb_wbsdram.dut.wb_sel_i[1:0]
+@22
+tb_wbsdram.dut.wb_adr_i[23:0]
+tb_wbsdram.dut.wb_dat_i[15:0]
+@28
+tb_wbsdram.dut.wb_stall_o
+tb_wbsdram.dut.wb_ack_o
+@22
+tb_wbsdram.dut.wb_dat_o[15:0]
+@200
+-
+-BUS
+@28
+tb_wbsdram.dut.bus_req_valid
+tb_wbsdram.dut.bus_req_ready
+tb_wbsdram.dut.bus_req_write
+@22
+tb_wbsdram.dut.bus_req_addr[23:0]
+tb_wbsdram.dut.bus_req_wdata[15:0]
+@28
+tb_wbsdram.dut.bus_req_byteenable[1:0]
+tb_wbsdram.dut.bus_rsp_early_valid
+tb_wbsdram.dut.bus_rsp_valid
+@22
+tb_wbsdram.dut.bus_rsp_rdata[15:0]
+@200
+-
+-
+-SDRAM
+@28
+tb_wbsdram.sdram_model.Sys_clk
+tb_wbsdram.sdram_cke
+tb_wbsdram.sdram_cs_n
+tb_wbsdram.sdram_ras_n
+tb_wbsdram.sdram_cas_n
+tb_wbsdram.sdram_we_n
+(1)tb_wbsdram.sdram_addr[11:0]
+tb_wbsdram.sdram_ba[1:0]
+@c00024
+tb_wbsdram.sdram_addr[11:0]
+@28
+(0)tb_wbsdram.sdram_addr[11:0]
+(1)tb_wbsdram.sdram_addr[11:0]
+(2)tb_wbsdram.sdram_addr[11:0]
+(3)tb_wbsdram.sdram_addr[11:0]
+(4)tb_wbsdram.sdram_addr[11:0]
+(5)tb_wbsdram.sdram_addr[11:0]
+(6)tb_wbsdram.sdram_addr[11:0]
+(7)tb_wbsdram.sdram_addr[11:0]
+(8)tb_wbsdram.sdram_addr[11:0]
+(9)tb_wbsdram.sdram_addr[11:0]
+(10)tb_wbsdram.sdram_addr[11:0]
+(11)tb_wbsdram.sdram_addr[11:0]
+@1401200
+-group_end
+@28
+tb_wbsdram.sdram_dqm[1:0]
+@22
+tb_wbsdram.sdram_dq[15:0]
+@200
+-
+-Controller
+@820
+tb_wbsdram.dut.u_sdram_ctrl.sdram_state_str[95:0]
+@200
+-
+[pattern_trace] 1
+[pattern_trace] 0

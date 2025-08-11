@@ -47,6 +47,7 @@ module sdram_controller #(
     input  logic [DW/8-1:0] bus_req_byteenable,     // byte enable
     output logic            bus_req_ready,          // ready
 
+    output logic            bus_rsp_early_valid,    // one cycle before read data valid
     output logic            bus_rsp_valid,          // read data valid
     output logic [DW-1:0]   bus_rsp_rdata,          // read data
 
@@ -532,6 +533,7 @@ assign int_bus_req = bus_req_read_q | bus_req_write_q;
 
 assign bus_rsp_valid_next  = wait_read_data & (read_latency_cnt == 0);
 assign bus_rsp_rdata_next  = sdram_dq;
+assign bus_rsp_early_valid = bus_rsp_valid_next;
 
 // Decode the bus address to sdram bank, row, col
 assign {bank, row, col} = bus_req_addr_q[AW-1:BW];
