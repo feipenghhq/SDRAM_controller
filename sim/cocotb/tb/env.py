@@ -20,13 +20,16 @@ clk_freq = int(os.environ.get("FREQ", 50))
 clk_period = round(1000.0 / clk_freq)
 clk_period = round(clk_period, 2)
 
-def load_mode_reg(dut, burst_len=0, burst_type=0, cas=2, write_burst_mode=0):
+def load_config(dut, burst_len=0, burst_type=0, cas=2, write_burst_mode=0):
+    """
+    Load the config signal
+    """
     dut.cfg_burst_length.value  = burst_len
     dut.cfg_burst_type.value    = burst_type
     dut.cfg_cas_latency.value   = cas
     dut.cfg_burst_mode.value    = write_burst_mode
 
-async def init(dut, period = 10, debug=False):
+async def init(dut, period = 10, debug_model=False):
     """
     Initialize the environment: setup clock, load the hack rom and reset the design
     """
@@ -38,7 +41,7 @@ async def init(dut, period = 10, debug=False):
     await Timer(period * 5, units="ns")
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
-    if not debug:
+    if not debug_model:
         dut.sdram_model.Debug.value = 0
 
 step_val = 0
@@ -64,7 +67,7 @@ class Reporter:
         self.step_val = 0
         self.step_thres = total * step / 100
 
-    def report_progress(self, delta):
+    def report_progress(self, delta=1):
         """
         Logs a progress to the cocotb logger.
 
@@ -78,7 +81,7 @@ class Reporter:
             return
 
         self.step_val = 0
-        percent = int((self.index + 1) * 100 / self.total)
+        percent = int((self.index) * 100 / self.total)
         filled = int(self.bar_width * percent / 100)
         empty = self.bar_width - filled
         bar = "█" * filled + "░" * empty

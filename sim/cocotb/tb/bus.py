@@ -7,24 +7,22 @@
 # Date Created: 07/18/2025
 #
 # -------------------------------------------------------------------
-# Bus BFM
+# BFM for the Generic system bus used in sdram_controller
 # -------------------------------------------------------------------
 
-from cocotb.triggers import FallingEdge, RisingEdge
+from cocotb.triggers import FallingEdge, RisingEdge, ReadWrite
 
 def bus_init(dut):
     """
     Initialize the bus
     """
-    dut.bus_req_read.value      = 0
-    dut.bus_req_write.value     = 0
-    dut.bus_req_addr.value      = 0
-    dut.bus_req_burst.value     = 0
-    dut.bus_req_burst_len.value = 0
-    dut.bus_req_wdata.value     = 0
+    dut.bus_req_valid.value      = 0
+    dut.bus_req_write.value      = 0
+    dut.bus_req_addr.value       = 0
+    dut.bus_req_wdata.value      = 0
     dut.bus_req_byteenable.value = 0
 
-async def bus_write(
+async def single_write(
     dut,
     addr: int,
     data: int,
@@ -40,24 +38,29 @@ async def bus_write(
     - byte_en: Byte enable
     """
     # Address phase
+    await ReadWrite()
+    dut.bus_req_valid.value      = 1
     dut.bus_req_write.value      = 1
     dut.bus_req_addr.value       = addr
     dut.bus_req_wdata.value      = data
     dut.bus_req_byteenable.value = byte_en
 
     await RisingEdge(dut.clk)
-    # Wait for slave to be ready (optional depending on DUT)
+    await ReadWrite()
+    # Wait for the ready
     while not dut.bus_req_ready.value:
         await RisingEdge(dut.clk)
+        await ReadWrite()
 
-    await FallingEdge(dut.clk)
-    # Drive idle values after write address phase
+    # Drive idle values after write request accepted
+    await RisingEdge(dut.clk)
+    await ReadWrite()
     dut.bus_req_write.value      = 0
     dut.bus_req_addr.value       = 0
     dut.bus_req_wdata.value      = 0
     dut.bus_req_byteenable.value = 0
 
-async def bus_read(
+async def single_read(
     dut,
     addr: int,
     byte_en: int = 2,
@@ -71,42 +74,37 @@ async def bus_read(
     - byte_en: Byte enable
     """
     # Address phase
-    dut.bus_req_read.value       = 1
+    dut.bus_req_valid.value      = 1
+    dut.bus_req_write.value      = 0
     dut.bus_req_addr.value       = addr
     dut.bus_req_byteenable.value = byte_en
 
     await RisingEdge(dut.clk)
-    # Wait for slave to be ready (optional depending on DUT)
+    await ReadWrite()
+    # Wait for the ready
     while not dut.bus_req_ready.value:
         await RisingEdge(dut.clk)
+        await ReadWrite()
 
-    await FallingEdge(dut.clk)
-    # Drive idle values after write address phase
-    dut.bus_req_read.value       = 0
+    # Drive idle values after read request is accepted
+    await RisingEdge(dut.clk)
+    await ReadWrite()
+    dut.bus_req_valid.value      = 0
     dut.bus_req_addr.value       = 0
     dut.bus_req_byteenable.value = 0
 
-async def bus_read_response(dut, expected=None, debug=False):
+async def single_read_resp(dut):
     """
-    Monitor the bus and receive read data
+    Receive one read data
 
     Parameters:
     - dut: The DUT handle
-    - expected: List of expected data
     """
-    i = 0
-    if expected:
-        for exp_data in expected:
-            await RisingEdge(dut.bus_rsp_valid)
-            await FallingEdge(dut.clk)
-            data = dut.bus_rsp_rdata.value.integer
-            assert data == exp_data, dut._log.error(f"[BUS READ] Wrong read data. Expected: {exp_data}. Actual: {data}")
-            i += 1
-            if debug:
-                dut._log.info(f"[BUS READ] Read data count: {i}")
-        dut._log.info(f"[BUS READ] Read all expected data!!!")
-        return
-    else:
-        await RisingEdge(dut.bus_rsp_valid)
-        await FallingEdge(dut.clk)
-        return dut.bus_rsp_rdata.value
+    await RisingEdge(dut.clk)
+    await ReadWrite()
+    # Wait for the rvalid
+    while not dut.bus_rsp_valid.value:
+        await RisingEdge(dut.clk)
+        await ReadWrite()
+    data = dut.bus_rsp_rdata.value.integer
+    return data

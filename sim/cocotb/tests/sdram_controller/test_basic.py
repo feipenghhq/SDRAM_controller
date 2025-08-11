@@ -13,18 +13,24 @@
 import cocotb
 from cocotb.triggers import Timer
 from cocotb.regression import TestFactory
+
+import sys
+sys.path.append('../../tb')
+
 from env import *
 from bus import *
 
-#@cocotb.test()
+@cocotb.test()
 async def test_write(dut):
     """
     Test Single Write request
     """
-    load_mode_reg(dut)
-    await init(dut, clk_period)
+    addr = 0x1234
+    data = 0x5678
+    load_config(dut)
+    await init(dut, clk_period, True)
     await Timer(101, units='us')
-    await bus_write(dut, 0x1111, 0x1234, 0x3)
+    await single_write(dut, addr, data, 0x3)
     await Timer(1, units='us')
 
 async def test_read(dut, cl=2):
@@ -33,16 +39,14 @@ async def test_read(dut, cl=2):
     """
     addr = 0xcafe
     data = 0xbeef
-    load_mode_reg(dut, cas=cl)
+    load_config(dut, cas=cl)
     await init(dut, clk_period, True)
-    read_monitor = cocotb.start_soon(bus_read_response(dut, [data]))
     await Timer(101, units='us')
-    await bus_write(dut, addr, data, 0x3)
-    await bus_read(dut, addr, 0x3)
-    await Timer(1, units='us')
+    read_monitor = cocotb.start_soon(single_read_resp(dut))
+    await single_write(dut, addr, data, 0x3)
+    await single_read(dut, addr, 0x3)
     await read_monitor
     await Timer(100, units='ns')
-
 
 factory = TestFactory(test_read)
 factory.add_option("cl", [2, 3])

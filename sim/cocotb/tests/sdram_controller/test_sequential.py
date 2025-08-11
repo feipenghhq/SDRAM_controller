@@ -10,12 +10,14 @@
 # Sequential read write
 # -------------------------------------------------------------------
 
-import os
 import random
 import cocotb
-from cocotb.triggers import FallingEdge, RisingEdge, Timer
+from cocotb.triggers import Timer
 from cocotb.regression import TestFactory
-from cocotb.clock import Clock
+
+import sys
+sys.path.append('../../tb')
+
 from env import *
 from bus import *
 
@@ -35,18 +37,20 @@ async def test_sequential_read_write(dut, start_addr=0, end_addr=0x1000):
     dut._log.info(f"Running Sequential test. Start addr {hex(start_addr)}. End addr {hex(end_addr)}. Number of location: {num}")
     reporter = Reporter(dut._log, "Progress", 2*num)
     # cocotb test sequence
-    load_mode_reg(dut, cas=cl)
+    load_config(dut, cas=cl)
     await init(dut, clk_period, False)
-    read_monitor = cocotb.start_soon(bus_read_response(dut, data))
     await Timer(101, units='us')
     for i in range(num):
         addr = start_addr + i * 2
-        await bus_write(dut, addr, data[i], 0x3)
-        reporter.report_progress(1)
+        await single_write(dut, addr, data[i], 0x3)
+        reporter.report_progress()
     for i in range(num):
         addr = start_addr + i * 2
-        await bus_read(dut, addr, 0x3)
-        reporter.report_progress(1)
+        read_monitor = cocotb.start_soon(single_read_resp(dut))
+        await single_read(dut, addr, 0x3)
+        rdata = await read_monitor
+        assert rdata == data[i]
+        reporter.report_progress()
     await Timer(1, units='us')
     dut._log.info(f"Completed all the Operations!")
     await read_monitor

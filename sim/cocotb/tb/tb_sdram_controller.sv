@@ -17,7 +17,7 @@
 `define CLK_FREQ 133
 `endif
 
-module tb_top;
+module tb_sdram_controller;
     parameter DW = 16;
     parameter AW = 24;
 
@@ -32,14 +32,13 @@ module tb_top;
     logic           cfg_burst_mode;
 
     // System bus_req
-    logic           bus_req_read;
+    logic           bus_req_valid;
     logic           bus_req_write;
     logic [AW-1:0]  bus_req_addr;
-    logic           bus_req_burst;
-    logic [2:0]     bus_req_burst_len;
     logic [DW-1:0]  bus_req_wdata;
     logic [1:0]     bus_req_byteenable;
     logic           bus_req_ready;
+
     logic           bus_rsp_valid;
     logic [DW-1:0]  bus_rsp_rdata;
 
@@ -60,7 +59,7 @@ module tb_top;
 
     always_comb sdram_clk <= #CLK_DELAY clk;
 
-    sdram_MT48LC8M16A2 #(.CLK_FREQ(`CLK_FREQ))
+    sdram_controller #(.CLK_FREQ(`CLK_FREQ))
     dut (
         .*
     );

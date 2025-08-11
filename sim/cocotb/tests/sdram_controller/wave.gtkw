@@ -1,0 +1,83 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Sat Aug  9 04:20:17 2025
+[*]
+[dumpfile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/sdram_controller/sim_build/tb_sdram_controller.fst"
+[dumpfile_mtime] "Sat Aug  9 04:18:32 2025"
+[dumpfile_size] 33851
+[savefile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/sdram_controller/wave.gtkw"
+[timestart] 0
+[size] 3366 1240
+[pos] -51 -1
+*-26.000000 106704000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb_sdram_controller.
+[treeopen] tb_sdram_controller.dut.
+[sst_width] 388
+[signals_width] 420
+[sst_expanded] 1
+[sst_vpaned_height] 253
+@28
+tb_sdram_controller.rst_n
+tb_sdram_controller.clk
+@200
+-
+-BUS
+@28
+tb_sdram_controller.dut.bus_req_valid
+tb_sdram_controller.dut.bus_req_ready
+tb_sdram_controller.dut.bus_req_write
+@22
+tb_sdram_controller.dut.bus_req_addr[23:0]
+tb_sdram_controller.dut.bus_req_wdata[15:0]
+@28
+tb_sdram_controller.dut.bus_req_byteenable[1:0]
+@200
+-
+@28
+tb_sdram_controller.dut.bus_rsp_valid
+@22
+tb_sdram_controller.dut.bus_rsp_rdata[15:0]
+@200
+-
+-SDRAM
+@28
+tb_sdram_controller.sdram_cke
+tb_sdram_controller.sdram_cs_n
+tb_sdram_controller.sdram_ras_n
+tb_sdram_controller.sdram_cas_n
+tb_sdram_controller.sdram_we_n
+(1)tb_sdram_controller.sdram_addr[11:0]
+tb_sdram_controller.sdram_ba[1:0]
+@c00024
+tb_sdram_controller.sdram_addr[11:0]
+@28
+(0)tb_sdram_controller.sdram_addr[11:0]
+(1)tb_sdram_controller.sdram_addr[11:0]
+(2)tb_sdram_controller.sdram_addr[11:0]
+(3)tb_sdram_controller.sdram_addr[11:0]
+(4)tb_sdram_controller.sdram_addr[11:0]
+(5)tb_sdram_controller.sdram_addr[11:0]
+(6)tb_sdram_controller.sdram_addr[11:0]
+(7)tb_sdram_controller.sdram_addr[11:0]
+(8)tb_sdram_controller.sdram_addr[11:0]
+(9)tb_sdram_controller.sdram_addr[11:0]
+(10)tb_sdram_controller.sdram_addr[11:0]
+(11)tb_sdram_controller.sdram_addr[11:0]
+@1401200
+-group_end
+@28
+tb_sdram_controller.sdram_dqm[1:0]
+@22
+tb_sdram_controller.sdram_dq[15:0]
+@200
+-
+-SDRAM
+@28
+tb_sdram_controller.sdram_model.Sys_clk
+@200
+-
+-INTERNAL
+@820
+tb_sdram_controller.dut.sdram_state_str[95:0]
+[pattern_trace] 1
+[pattern_trace] 0

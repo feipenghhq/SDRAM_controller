@@ -12,9 +12,12 @@
 
 import random
 import cocotb
-from cocotb.triggers import FallingEdge, RisingEdge, Timer
+from cocotb.triggers import Timer
 from cocotb.regression import TestFactory
-from cocotb.clock import Clock
+
+import sys
+sys.path.append('../../tb')
+
 from env import *
 from bus import *
 
@@ -68,20 +71,22 @@ async def test_random_read_write(dut, num_op=10, num_seq=10):
     # cocotb test sequence
     rc = 0
     wc = 0
-    load_mode_reg(dut, cas=cl)
+    load_config(dut, cas=cl)
     await init(dut, clk_period, False)
-    read_monitor = cocotb.start_soon(bus_read_response(dut, expected))
     await Timer(101, units='us')
     for op, idx in test_sequence:
         if op:  # read
             addr, _ = addr_data[idx]
-            await bus_read(dut, addr, 0x3)
+            read_monitor = cocotb.start_soon(single_read_resp(dut))
+            await single_read(dut, addr, 0x3)
+            rdata = await read_monitor
+            assert rdata == expected.pop(0)
             rc += 1
         else:   # write
             addr, data = addr_data[idx]
-            await bus_write(dut, addr, data, 0x3)
+            await single_write(dut, addr, data, 0x3)
             wc += 1
-        reporter.report_progress(1)
+        reporter.report_progress()
     await Timer(1, units='us')
     dut._log.info(f"Completed all the Operations!")
     await read_monitor

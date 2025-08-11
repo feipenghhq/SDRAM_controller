@@ -10,9 +10,6 @@
 # Regression Test
 # -------------------------------------------------------------------
 
-import random
-import os
-
 from test_random import test_random_read_write
 from test_sequential import test_sequential_read_write
 from cocotb.regression import TestFactory

@@ -7,11 +7,9 @@ SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
 #WAVES = 1
 
-RTL_SOURCES     += $(shell find $(REPO)/rtl -name "*.sv")
-VERILOG_SOURCES += $(RTL_SOURCES)
-VERILOG_SOURCES += ../model/MT48LC8M16A2.v
-VERILOG_SOURCES += ../tb/tb_top.sv
-VERILOG_INCLUDE_DIRS += $(shell dirname $(shell find $(REPO)/rtl -name "*.svh"))
+VERILOG_SOURCES += $(REPO)/rtl/sdram/sdram_controller.sv
+VERILOG_SOURCES += $(REPO)/sim/cocotb/tb/tb_sdram_controller.sv
+VERILOG_SOURCES += $(REPO)/sim/cocotb/model/MT48LC8M16A2.v
 
 COMPILE_ARGS += -D SIMULATION=1
 
@@ -19,7 +17,7 @@ FREQ ?= 133
 COMPILE_ARGS += -D CLK_FREQ=$(FREQ)
 
 # TOPLEVEL is the name of the toplevel module in your Verilog or VHDL file
-TOPLEVEL = tb_top
+TOPLEVEL = tb_sdram_controller
 
 # MODULE is the basename of the Python test file
 MODULE = test_basic
@@ -31,4 +29,4 @@ lint:
 	verilator --lint-only -Wall $(RTL_SOURCES) --top-module sdram_controller
 
 waveform:
-	gtkwave sim_build/tb_top.fst wave.gtkw &
+	gtkwave sim_build/$(TOPLEVEL).fst wave.gtkw &
