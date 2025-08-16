@@ -1,5 +1,5 @@
 # KEY
-set_location_assignment PIN_G26 -to KEY
+set_location_assignment PIN_G26 -to RESETn
 
 # CLOCK
 set_location_assignment PIN_N2 -to CLOCK_50
@@ -17,8 +17,8 @@ set_location_assignment PIN_W4 -to SDRAM_ADDR[8]
 set_location_assignment PIN_W3 -to SDRAM_ADDR[9]
 set_location_assignment PIN_Y1 -to SDRAM_ADDR[10]
 set_location_assignment PIN_V5 -to SDRAM_ADDR[11]
-set_location_assignment PIN_AE2 -to SDRAM_BA_0
-set_location_assignment PIN_AE3 -to SDRAM_BA_1
+set_location_assignment PIN_AE2 -to SDRAM_BA[0]
+set_location_assignment PIN_AE3 -to SDRAM_BA[1]
 set_location_assignment PIN_AB3 -to SDRAM_CAS_N
 set_location_assignment PIN_AA6 -to SDRAM_CKE
 set_location_assignment PIN_AA7 -to SDRAM_CLK
@@ -39,7 +39,7 @@ set_location_assignment PIN_AA3 -to SDRAM_DQ[12]
 set_location_assignment PIN_AC2 -to SDRAM_DQ[13]
 set_location_assignment PIN_AC1 -to SDRAM_DQ[14]
 set_location_assignment PIN_AA5 -to SDRAM_DQ[15]
-set_location_assignment PIN_AD2 -to SDRAM_LDQM
-set_location_assignment PIN_Y5 -to SDRAM_UDQM
+set_location_assignment PIN_AD2 -to SDRAM_DQM[0]
+set_location_assignment PIN_Y5 -to SDRAM_DQM[1]
 set_location_assignment PIN_AB4 -to SDRAM_RAS_N
 set_location_assignment PIN_AD3 -to SDRAM_WE_N

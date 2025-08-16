@@ -36,7 +36,7 @@
 // synopsys translate_off
 `timescale 1 ps / 1 ps
 // synopsys translate_on
-module pll_130 (
+module altpll_130 (
 	inclk0,
 	c0,
 	c1);

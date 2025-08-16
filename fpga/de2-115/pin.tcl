@@ -1,5 +1,5 @@
 # KEY
-set_location_assignment PIN_M23 -to KEY
+set_location_assignment PIN_M23 -to RESETn
 set_instance_assignment -name IO_STANDARD "3.3-V LVTTL" -to KEY
 
 # CLOCK

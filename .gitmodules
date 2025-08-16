@@ -1,0 +1,3 @@
+[submodule "ip/Altera-VJTAG-Host"]
+	path = ip/Altera-VJTAG-Host
+	url = git@github.com:feipenghhq/Altera-VJTAG-Host.git

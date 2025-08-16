@@ -12,16 +12,16 @@ PROJECT ?= sdram
 TOP ?= top
 # verilog source files
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_controller.sv
-VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_ctrl_auto_precharge.sv
-VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_ctrl_manual_precharge.sv
-VERILOG += $(GIT_ROOT)/rtl/chip/sdram_IS42S16400.sv
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_ctrl.sv
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_ip.v
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/vjtag_host.sv
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/pll_25.v
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/pll_50.v
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/pll_100.v
-VERILOG += $(GIT_ROOT)/fpga/de2/rtl/pll_130.v
+VERILOG += $(GIT_ROOT)/rtl/sdram/wbsdram.sv
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_25.v
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_50.v
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_100.v
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_130.v
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_top.v
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/vjtag2sdram/fpga_vjtag2sdram.sv
+VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag_ctrl.sv
+VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag_ip.v
+VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag2wb.sv
 VERILOG += $(GIT_ROOT)/fpga/de2/top.sv
 # verilog include directory
 SEARCH ?=

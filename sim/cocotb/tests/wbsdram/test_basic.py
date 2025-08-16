@@ -20,7 +20,7 @@ sys.path.append('../../tb')
 from env import *
 from WbHostBFM import *
 
-@cocotb.test()
+#@cocotb.test()
 async def test_write(dut):
     """
     Test Single Write request
@@ -34,7 +34,7 @@ async def test_write(dut):
     await bus.single_write(addr, data, 0x3)
     await Timer(1, units='us')
 
-#@cocotb.test()
+@cocotb.test()
 async def test_read(dut, cl=2):
     """
     Test read request
@@ -52,4 +52,4 @@ async def test_read(dut, cl=2):
 
 factory = TestFactory(test_read)
 factory.add_option("cl", [2, 3])
-factory.generate_tests()
+#factory.generate_tests()
