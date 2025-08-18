@@ -40,6 +40,7 @@ async def test_sequential_read_write(dut, start_addr=0, end_addr=0x1000):
     load_config(dut, cas=cl)
     await init(dut, clk_period, False)
     await Timer(101, units='us')
+    await RisingEdge(dut.clk)
     for i in range(num):
         addr = start_addr + i * 2
         await single_write(dut, addr, data[i], 0x3)
@@ -49,7 +50,7 @@ async def test_sequential_read_write(dut, start_addr=0, end_addr=0x1000):
         read_monitor = cocotb.start_soon(single_read_resp(dut))
         await single_read(dut, addr, 0x3)
         rdata = await read_monitor
-        assert rdata == data[i]
+        assert rdata == data[i], dut._log.error(f'Addr: {hex(addr)}. Expected {hex(data[i])}. Actual {hex(rdata)}.')
         reporter.report_progress()
     await Timer(1, units='us')
     dut._log.info(f"Completed all the Operations!")

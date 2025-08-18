@@ -44,6 +44,7 @@ async def test_write(dut, cl=2, num=4, debug=True):
     await init(dut, clk_period, debug)
     await Timer(101, units='us')
 
+    await RisingEdge(dut.clk)
     for addr, data in stimulus:
         await single_write(dut, addr, data, 0x3)
     await Timer(1, units='us')
@@ -65,6 +66,7 @@ async def test_read(dut, cl=2, num=4, debug=True):
     load_config(dut, cas=cl)
     await init(dut, clk_period, debug)
     await Timer(101, units='us')
+    await RisingEdge(dut.clk)
 
     for addr, data in stimulus:
         await single_write(dut, addr, data, 0x3)

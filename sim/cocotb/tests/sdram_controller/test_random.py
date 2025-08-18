@@ -74,6 +74,8 @@ async def test_random_read_write(dut, num_op=10, num_seq=10):
     load_config(dut, cas=cl)
     await init(dut, clk_period, False)
     await Timer(101, units='us')
+    await RisingEdge(dut.clk)
+
     for op, idx in test_sequence:
         if op:  # read
             addr, _ = addr_data[idx]

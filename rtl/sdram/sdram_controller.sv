@@ -165,6 +165,9 @@ logic                       arc_IDLE_to_WRITE;
 logic                       arc_ROW_ACTIVE_to_WRITE;
 logic                       arc_ROW_ACTIVE_to_READ;
 logic                       arc_WRITE_to_IDLE;
+logic                       arc_WRITE_to_WRITE;
+logic                       arc_WRITE_to_READ;
+logic                       arc_WRITE_to_PRECHARGE;
 logic                       arc_READ_to_IDLE;
 logic                       arc_PRECHARGE_to_AUTO_REFRESH;
 logic                       arc_PRECHARGE_to_ROW_ACTIVE;
@@ -223,7 +226,7 @@ logic                       refresh_req;
 // command counter and cmd indicator
 logic [CMD_CNT_WIDTH-1:0]   cmd_cnt;
 logic                       cmd_cpl;
-logic                       pre_cmd_cpl;        // one cycle before cmd_cpl
+logic                       early_cmd_cpl;      // one cycle before cmd_cpl
 
 
 // CL counter to indicate read data ready
@@ -292,7 +295,7 @@ always_ff @(posedge clk) begin
    bus_rsp_rdata <= bus_rsp_rdata_next;
 end
 
-assign bus_req_ready = ~int_bus_req & ~s_RESET & ~s_INIT;
+assign bus_req_ready = (~int_bus_req & ~s_RESET & ~s_INIT) | int_bus_cpl;   // TBD: Make this flopped version
 
 // ----------------------------------------------
 // Main state machine
@@ -310,40 +313,29 @@ assign s_AUTO_REFRESH = (sdram_state == SDRAM_AUTO_REFRESH);
 
 // state transaction arc
 
-// RESET -> INIT: Start SDRAM initialization sequence once coming out of reset
 assign arc_RESET_to_INIT = s_RESET;
 
-// INIT -> IDLE: Initialization complete
 assign arc_INIT_to_IDLE = s_INIT & (init_state == INIT_DONE);
 
-// IDLE -> ROW_ACTIVE:
 assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & ~refresh_req & int_bus_req & bank_precharged;
-// IDLE -> WRITE:
-assign arc_IDLE_to_WRITE = s_IDLE & ~refresh_req & bus_req_write_q & ~open_new_row;
-// IDLE -> READ:
-assign arc_IDLE_to_READ = s_IDLE & ~refresh_req & bus_req_read_q & ~open_new_row;
-// IDLE -> PRECHARGE:
-assign arc_IDLE_to_PRECHARGE = s_IDLE & (refresh_req | int_bus_req & open_new_row);
+assign arc_IDLE_to_WRITE      = s_IDLE & ~refresh_req & bus_req_write_q & ~open_new_row;
+assign arc_IDLE_to_READ       = s_IDLE & ~refresh_req & bus_req_read_q & ~open_new_row;
+assign arc_IDLE_to_PRECHARGE  = s_IDLE & (refresh_req | int_bus_req & open_new_row);
 
-// ROW ACTIVE -> WRITE
 assign arc_ROW_ACTIVE_to_WRITE = s_ROW_ACTIVE & cmd_cpl & bus_req_write_q;
-// ROW ACTIVE -> READ
-assign arc_ROW_ACTIVE_to_READ = s_ROW_ACTIVE & cmd_cpl & bus_req_read_q;
+assign arc_ROW_ACTIVE_to_READ  = s_ROW_ACTIVE & cmd_cpl & bus_req_read_q;
 
-// WRITE -> IDLE:
-assign arc_WRITE_to_IDLE = s_WRITE & cmd_cpl;
+assign arc_WRITE_to_IDLE      = s_WRITE & cmd_cpl & ~refresh_req & ~int_bus_req;
+assign arc_WRITE_to_WRITE     = s_WRITE & cmd_cpl & ~refresh_req & bus_req_write_q & ~open_new_row;
+assign arc_WRITE_to_READ      = s_WRITE & cmd_cpl & ~refresh_req & bus_req_read_q & ~open_new_row;
+assign arc_WRITE_to_PRECHARGE = s_WRITE & cmd_cpl & (refresh_req | int_bus_req & open_new_row);
 
-// READ -> IDLE:
 assign arc_READ_to_IDLE = s_READ & cmd_cpl;
 
-// PRECHARGE -> AUTO_REFRESH
 assign arc_PRECHARGE_to_AUTO_REFRESH = s_PRECHARGE & cmd_cpl & refresh_req;
-// PRECHARGE -> ROW_ACTIVE
-assign arc_PRECHARGE_to_ROW_ACTIVE = s_PRECHARGE & cmd_cpl & ~refresh_req;
+assign arc_PRECHARGE_to_ROW_ACTIVE   = s_PRECHARGE & cmd_cpl & ~refresh_req;
 
-// AUTO_REFRESH -> IDLE:
-assign arc_AUTO_REFRESH_to_IDLE = s_AUTO_REFRESH & cmd_cpl & ~int_bus_req;
-// AUTO_REFRESH -> ROW_ACTIVE:
+assign arc_AUTO_REFRESH_to_IDLE       = s_AUTO_REFRESH & cmd_cpl & ~int_bus_req;
 assign arc_AUTO_REFRESH_to_ROW_ACTIVE = s_AUTO_REFRESH & cmd_cpl & int_bus_req;
 
 // state transition
@@ -356,23 +348,30 @@ always_ff @(posedge clk) begin
     end
 end
 
+logic to_IDLE;
+logic to_ROW_ACTIVE;
+logic to_READ;
+logic to_WRITE;
+logic to_PRECHARGE;
+logic to_REFRESH;
+
+assign to_IDLE = arc_INIT_to_IDLE | arc_WRITE_to_IDLE | arc_READ_to_IDLE | arc_AUTO_REFRESH_to_IDLE;
+assign to_ROW_ACTIVE = arc_IDLE_to_ROW_ACTIVE | arc_PRECHARGE_to_ROW_ACTIVE | arc_AUTO_REFRESH_to_ROW_ACTIVE;
+assign to_READ = arc_IDLE_to_READ | arc_ROW_ACTIVE_to_READ | arc_WRITE_to_READ;
+assign to_WRITE = arc_IDLE_to_WRITE | arc_ROW_ACTIVE_to_WRITE | arc_WRITE_to_WRITE;
+assign to_PRECHARGE = arc_IDLE_to_PRECHARGE | arc_WRITE_to_PRECHARGE;
+assign to_REFRESH = arc_PRECHARGE_to_AUTO_REFRESH;
+
 always_comb begin
     case (1)
-        arc_RESET_to_INIT:              sdram_state_next = SDRAM_INIT;
-        arc_INIT_to_IDLE:               sdram_state_next = SDRAM_IDLE;
-        arc_IDLE_to_ROW_ACTIVE:         sdram_state_next = SDRAM_ROW_ACTIVE;
-        arc_IDLE_to_READ:               sdram_state_next = SDRAM_READ;
-        arc_IDLE_to_WRITE:              sdram_state_next = SDRAM_WRITE;
-        arc_IDLE_to_PRECHARGE:          sdram_state_next = SDRAM_PRECHARGE;
-        arc_ROW_ACTIVE_to_WRITE:        sdram_state_next = SDRAM_WRITE;
-        arc_ROW_ACTIVE_to_READ:         sdram_state_next = SDRAM_READ;
-        arc_WRITE_to_IDLE:              sdram_state_next = SDRAM_IDLE;
-        arc_READ_to_IDLE:               sdram_state_next = SDRAM_IDLE;
-        arc_PRECHARGE_to_AUTO_REFRESH:  sdram_state_next = SDRAM_AUTO_REFRESH;
-        arc_PRECHARGE_to_ROW_ACTIVE:    sdram_state_next = SDRAM_ROW_ACTIVE;
-        arc_AUTO_REFRESH_to_IDLE:       sdram_state_next = SDRAM_IDLE;
-        arc_AUTO_REFRESH_to_ROW_ACTIVE: sdram_state_next = SDRAM_ROW_ACTIVE;
-        default:                        sdram_state_next = sdram_state;
+        arc_RESET_to_INIT:  sdram_state_next = SDRAM_INIT;
+        to_IDLE:            sdram_state_next = SDRAM_IDLE;
+        to_ROW_ACTIVE:      sdram_state_next = SDRAM_ROW_ACTIVE;
+        to_READ:            sdram_state_next = SDRAM_READ;
+        to_WRITE:           sdram_state_next = SDRAM_WRITE;
+        to_PRECHARGE:       sdram_state_next = SDRAM_PRECHARGE;
+        to_REFRESH:         sdram_state_next = SDRAM_AUTO_REFRESH;
+        default:            sdram_state_next = sdram_state;
     endcase
 end
 
@@ -462,7 +461,7 @@ always_ff @(posedge clk) begin
 end
 
 assign cmd_cpl = cmd_cnt == 0;
-assign pre_cmd_cpl = cmd_cnt == 1;
+assign early_cmd_cpl = cmd_cnt == 1;
 
 // ----------------------------------------------
 // CAS Latency counter
@@ -649,14 +648,37 @@ always_comb begin
                 sdram_dqm_next = ~bus_req_byteenable_q;
             end
 
-            // For write request with tWR < CLK PERIOD:
-            // The write is completing in the next cycle so de-assert int_busy in next cycle // FIXME
-            //if (cWR == 1) int_busy_next = ~arc_ROW_ACTIVE_to_WRITE;
+            // int_bus_cpl = (Write complete - 1) cycle
+            if (cWR == 1) int_bus_cpl = bus_req_write_q;
         end
 
         SDRAM_WRITE: begin
-            int_bus_cpl = cmd_cpl;
-            //if (cWR > 1) int_busy_next = ~pre_cmd_cpl; // FIXME
+            // int_bus_cpl = (write complete - 1) cycle
+            if (cWR == 1) int_bus_cpl = bus_req_write_q & ~arc_WRITE_to_PRECHARGE;
+            else          int_bus_cpl = early_cmd_cpl;
+            // A new write request
+            if (arc_WRITE_to_WRITE) begin
+                sdram_cmd = CMD_WRITE;
+                sdram_addr_next = {sdram_addr_col[RAW-1:11], 1'b0, sdram_addr_col[9:0]};
+                sdram_ba_next = bank;
+                sdram_dqm_next = ~bus_req_byteenable_q;
+                sdram_dq_out_next = bus_req_wdata_q;
+                sdram_dq_out_en_next = 1'b1;
+            end
+            // A new write request
+            else if (arc_WRITE_to_READ) begin
+                sdram_cmd = CMD_READ;
+                sdram_addr_next = {sdram_addr_col[RAW-1:11], 1'b0, sdram_addr_col[9:0]};
+                sdram_ba_next = bank;
+                sdram_dqm_next = ~bus_req_byteenable_q;
+            end
+            // FIXME: if tRCD + tWR < tRAS (=> cRCD + cWR < cRAS), this may cause tRAS violation
+            // Micron simulation reported violations
+            // Need to test this in real chip
+            else if (arc_WRITE_to_PRECHARGE) begin
+                sdram_cmd = CMD_PRECHARGE;
+                sdram_addr_next[10] = 1'b1;
+            end
         end
 
         SDRAM_READ: begin

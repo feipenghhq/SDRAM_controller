@@ -30,6 +30,7 @@ async def test_write(dut):
     load_config(dut)
     await init(dut, clk_period, True)
     await Timer(101, units='us')
+    await RisingEdge(dut.clk)
     await single_write(dut, addr, data, 0x3)
     await Timer(1, units='us')
 
@@ -42,6 +43,7 @@ async def test_read(dut, cl=2):
     load_config(dut, cas=cl)
     await init(dut, clk_period, True)
     await Timer(101, units='us')
+    await RisingEdge(dut.clk)
     read_monitor = cocotb.start_soon(single_read_resp(dut))
     await single_write(dut, addr, data, 0x3)
     await single_read(dut, addr, 0x3)

@@ -44,9 +44,6 @@ async def single_write(
     dut.bus_req_addr.value       = addr
     dut.bus_req_wdata.value      = data
     dut.bus_req_byteenable.value = byte_en
-
-    await RisingEdge(dut.clk)
-    await ReadWrite()
     # Wait for the ready
     while not dut.bus_req_ready.value:
         await RisingEdge(dut.clk)
@@ -55,6 +52,7 @@ async def single_write(
     # Drive idle values after write request accepted
     await RisingEdge(dut.clk)
     await ReadWrite()
+    dut.bus_req_valid.value      = 0
     dut.bus_req_write.value      = 0
     dut.bus_req_addr.value       = 0
     dut.bus_req_wdata.value      = 0
@@ -79,8 +77,6 @@ async def single_read(
     dut.bus_req_addr.value       = addr
     dut.bus_req_byteenable.value = byte_en
 
-    await RisingEdge(dut.clk)
-    await ReadWrite()
     # Wait for the ready
     while not dut.bus_req_ready.value:
         await RisingEdge(dut.clk)
