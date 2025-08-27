@@ -1,6 +1,6 @@
 # SDRAM Controller
 
-A high-performance SDRAM controller designed to interface with standard SDRAM chips.
+This repo implement a high-performance SDRAM controller designed to interface with standard SDRAM chips.
 
 ## Features
 
@@ -16,22 +16,20 @@ A high-performance SDRAM controller designed to interface with standard SDRAM ch
 ## Repository Structure
 
 ```text
-.
-├── doc                 # Documentation (datasheets, implementation)
-│   ├── datasheets
-├── fpga                # FPGA board-specific projects
-│   ├── de2
-│   └── de2-115
+
+├── doc                 # Documentation (datasheets, state machine, implementation)
+├── fpga                # FPGA projects
+├── ip                  # IP used in the design
 ├── LICENSE
 ├── README.md
-├── rtl                 # RTL source code for SDRAM controller
-│   ├── chip            # Pre-defined controller top level for different SDRAM chip
-│   └── sdram           # Various SDRAM controller implementation
+├── rtl
+│   ├── fpga_examples   # FPGA example RTL source code
+│   └── sdram           # SDRAM RTL source code
 ├── scripts
 │   ├── quartus         # Quartus build script
-│   └── sdram_test      # Test script using Virtual JTAG
+│   └── sdram_test      # SDRAM test script using Virtual JTAG
 └── sim
-    └── cocotb          # Cocotb simulation collateral
+    └── cocotb          # Cocotb simulation
 ```
 
 ## SDRAM Interface and Timing
@@ -65,119 +63,28 @@ A high-performance SDRAM controller designed to interface with standard SDRAM ch
 
 The timing can usually be found in the SDRAM Datasheet
 
-## SDRAM Bus Interface
-
-The SDRAM controller use a custom bus interface. It is divided into 2 channels: request channel and response channel.
-
-### Outstanding Transaction
-
-With 2 channel architecture, the sdram support outstanding or pipelined transaction.
-
-Parameter `MAX_OUTSTANDING` is added to indicate the maximum outstanding transaction it support.
-
-If `MAX_OUTSTANDING` is not defined:
-- The design does not support outstanding feature.
-- Current transaction must complete before the next transaction is issued.
-
-If `MAX_OUTSTANDING` is defined:
-- the value to indicate the maximum outstanding transaction the system supports/requires.
-
-### Interface
-
-#### Request Channel
-
-| Signal Name          | Direction | Description                                                |
-| -------------------- | --------- | ---------------------------------------------------------- |
-| `bus_req_read`       | Input     | Assert to initiate a read request                          |
-| `bus_req_write`      | Input     | Assert to initiate a write request                         |
-| `bus_req_addr`       | Input     | Byte address of the access                                 |
-| `bus_req_burst`      | Input     | High if the request is a burst. Only asserts on first req. |
-| `bus_req_burst_len`  | Input     | Burst length (number of beats).                            |
-| `bus_req_wdata`      | Input     | Write data for the memory write                            |
-| `bus_req_byteenable` | Input     | Byte enable mask for partial writes                        |
-| `bus_req_ready`      | Output    | High when controller is ready                              |
-
-Note on burst:
-  - `bus_req_burst` only asserts on the first beat of the burst request.
-  - `bus_req_burst_len` indicate the burst length and is valid when `bus_req_burst` is asserted.
-    the burst length.
-  - For read request, only one request is issued.
-  - For write request, the subsequence request will provide the next write data and next address. The address needs to
-    match with burst sequence
-
-#### Response Channel
-| Signal Name     | Direction | Description                 |
-| --------------- | --------- | --------------------------- |
-| `bus_rsp_valid` | Output    | Indicate read data is valid |
-| `bus_rsp_rdata` | Output    | Read data                   |
-
 ## Implementation
 
-### SDRAM Controller Variants
-
-This repository includes multiple SDRAM controller variants with different features sets
-
-The details of each design are documented in [sdram_implementation.md](doc/sdram_implementation.md).
-
-Currently these are the planned features sets:
-
-| Name               | Precharge Type   | Burst Support             | Status      |
-| ------------------ | ---------------- | ------------------------- | ----------- |
-| sdram_simple_ap.sv | auto precharge   | Single read/write only    | Done        |
-| sdram_simple_mp.sv | manual precharge | Single read/write only    | In progress |
-| sdram_burst_mp.sv  | manual precharge | Support burst transaction | TBD         |
-
-The RTL source file are located in `rtl/sdram`.
-
-### Pre-configured Top Modules for Target SDRAM Chip
-
-The repository also provides predefined top-level modules tailored for specific SDRAM chips.
-These modules come with parameters already configured to match the timing and organization of the target memory device.
-
-The RTL source for pre-configured top modules are located in `rtl/chip`.
-
-### Design Note
-
- See [sdram_implementation.md](doc/sdram_implementation.md) for detailed documentation on:
+Check [sdram_impl.md](doc/sdram_impl.md) for detailed documentation on:
  - parameter and interface
  - state machine
  - timing diagrams
 
-#### Important Architecture Note
+## FPGA Demo Program
 
-1. **Custom bus interface**
-    - Currently the design use a custom bus interface to interact with the sdram controller.
-    - Future version may support industry standard interface such as **AHB-Lite** or **AXI**
+The SDRAM controller is implemented and tested on DE2 and DE2-115 FPGA development boards.
 
-2. **Single Clock domain**
-    - The SDRAM controller runs in a single clock domain. The SDRAM clock is driven at the same frequency as the system clock.
-    - Future version may support asynchronous clock for the bus interface and SDRAM control logic
+### VJTAG to SDRAM
 
-3. **SDRAM CLK Phase Shift/Delay Consideration**
-    - SDRAM signals (control, address, data) are expected to be latched by the SDRAM chip near the end of the clock cycle. This provides more robust timing.
-    - However, it requires the SDRAM clock to be phase-shifted relative to the system clock to align correctly with the board layout and trace delay.
-    - Example: in Terasic DE2/DE2-115 FPGA board, the phase delay between SDRAM_CLK and system clock is -3ns. ([Reference 2/3](#reference))
+This FPGA demo program use **Altera Virtual JTAG Host Interface** to send request to the SDRAM controller in the FPGA
 
-## FPGA Test
+> The Virtual JTAG Host is implemented in another repo: [virtual-jtag-host](https://github.com/feipenghhq/virtual-jtag-host).
 
-The SDRAM controller has been implemented and tested on Altera FPGA development boards: DE2 and DE2-115.
+A test scripts is created to use VJTAG to test the SDRAM controller. It contains mainly 2 tests:
+- **access test**: Performs sequential memory access within a specified range.
+- **random test**: Performs randomized read/write tests to verify data integrity.
 
-**Altera Virtual JTAG Host Interface**
-
-A **VJTAG Host* is connected to the SDRAM controller in the FPGA. The host PC sends read/write command the SDRAM controller through the VJTAG Host.
-
-> The Virtual JTAG Host is implemented in another repo: [virtual-jtag-host](https://github.com/feipenghhq/virtual-jtag-host). More details can be found there.
-
-**Test Scripts**
-
-Two tests are provided:
-- **access_test**: Performs sequential memory access within a specified range.
-- **random_test**: Performs randomized read/write tests to verify data integrity.
-If you have the above FPGA board, you can test it in the board. Here are the commands
-
-**How to run**
-
-If you have a supported FPGA board (DE2 or DE2-115), you can run the SDRAM test as follows:
+To run the test in the FPGA
 
 ```sh
 cd fpga/de2     # or cd fpga/de2-115
@@ -186,12 +93,6 @@ make pgm        # Build the FPGA image and program the FPGA board
 cd scripts/sdram_test
 ./sdram_test.sh # Run SDRAM functional test via VJTAG
 ```
-
-> Note:
-> - DE2 (Cyclone II) requires Quartus 13.0sp1
-> - DE2-115 (Cyclone IV) requires a newer version of Quartus
-
-
 
 ## Reference
 
