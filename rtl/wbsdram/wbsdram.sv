@@ -62,39 +62,39 @@ module wbsdram #(
     inout  wire  [DW-1:0]   sdram_dq                // Data Input/Output bus.
 );
 
-    logic            bus_req_valid;
-    logic            bus_req_write;
-    logic [AW-1:0]   bus_req_addr;
-    logic [DW-1:0]   bus_req_wdata;
-    logic [DW/8-1:0] bus_req_byteenable;
-    logic            bus_req_ready;
-    logic            bus_rsp_early_valid;
-    logic            bus_rsp_valid;
-    logic [DW-1:0]   bus_rsp_rdata;
+    logic            req_valid;
+    logic            req_write;
+    logic [AW-1:0]   req_addr;
+    logic [DW-1:0]   req_wdata;
+    logic [DW/8-1:0] req_byteenable;
+    logic            req_ready;
+    logic            rsp_early_valid;
+    logic            rsp_valid;
+    logic [DW-1:0]   rsp_rdata;
 
     logic            req_is_write;
     logic            req_is_read;
 
 
     // Wishbone to genetic bus
-    assign bus_req_valid = wb_cyc_i & wb_stb_i;
-    assign bus_req_write = wb_we_i;
-    assign bus_req_addr  = wb_adr_i;
-    assign bus_req_wdata = wb_dat_i;
-    assign bus_req_byteenable = wb_sel_i;
+    assign req_valid = wb_cyc_i & wb_stb_i;
+    assign req_write = wb_we_i;
+    assign req_addr  = wb_adr_i;
+    assign req_wdata = wb_dat_i;
+    assign req_byteenable = wb_sel_i;
 
-    assign req_is_write = bus_req_valid & bus_req_write;
-    assign req_is_read  = bus_req_valid & ~bus_req_write;
+    assign req_is_write = req_valid & req_write;
+    assign req_is_read  = req_valid & ~req_write;
 
-    assign wb_stall_o = (req_is_write & ~bus_req_ready) | (req_is_read & ~bus_rsp_early_valid);
-    assign wb_dat_o   = bus_rsp_rdata;
+    assign wb_stall_o = (req_is_write & ~req_ready) | (req_is_read & ~rsp_early_valid);
+    assign wb_dat_o   = rsp_rdata;
 
     always @(posedge clk) begin
         if (!rst_n) begin
             wb_ack_o <= 1'b0;
         end
         else begin
-            wb_ack_o <= bus_req_valid & ~wb_stall_o;
+            wb_ack_o <= req_valid & ~wb_stall_o;
         end
     end
 
