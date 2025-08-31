@@ -1,0 +1,45 @@
+# -------------------------------------------------------------------
+# Copyright 2025 by Heqing Huang (feipenghhq@gamil.com)
+# -------------------------------------------------------------------
+#
+# Project: SDRAM Controller
+# Author: Heqing Huang
+# Date Created: 08/31/2025
+#
+# -------------------------------------------------------------------
+# yosys synthesis script
+# -------------------------------------------------------------------
+
+# read design
+read_verilog -sv ../../rtl/sdram/sdram_init.sv
+read_verilog -sv ../../rtl/sdram/sdram_ctrl.sv
+read_verilog -sv ../../rtl/sdram/sdram_cmd.sv
+read_verilog -sv ../../rtl/sdram/sdram_controller.sv
+hierarchy -check -top sdram_controller
+
+# the high-level stuff
+proc; opt
+memory; opt
+fsm; opt
+
+# mapping to internal cell library
+techmap; opt
+
+# split the net to single bit
+splitnets -ports; opt
+
+# mapping flip-flops to gscl45nm.lib
+dfflibmap -liberty gscl45nm.lib
+
+# mapping logic to gscl45nm.lib
+abc -liberty gscl45nm.lib
+
+# cleanup
+clean
+
+# write synthesized design
+flatten
+write_verilog -noattr -noexpr -renameprefix syn_ netlist.v
+
+# Dump synthesis statistics report
+stat

@@ -16,29 +16,30 @@ module altpll_top #(
             .c1     (sdram_clk_out));
         assign cfg_cas_latency  = 3'd2;
     end
-
-    if (CLK_FREQ == 50) begin: clk50
+    else if (CLK_FREQ == 50) begin: clk50
         altpll_50 u_pll(
             .inclk0 (clk),
             .c0     (sdram_clk),
             .c1     (sdram_clk_out));
         assign cfg_cas_latency  = 3'd2;
     end
-
-    if (CLK_FREQ == 100) begin: clk100
+    else if (CLK_FREQ == 100) begin: clk100
         altpll_100 u_pll(
             .inclk0 (clk),
             .c0     (sdram_clk),
             .c1     (sdram_clk_out));
         assign cfg_cas_latency  = 3'd3;
     end
-
-    if (CLK_FREQ == 130) begin: clk130 // CLK FREQ is actual 130
+    else if (CLK_FREQ == 130) begin: clk130
         altpll_130 u_pll(
             .inclk0 (clk),
             .c0     (sdram_clk),
             .c1     (sdram_clk_out));
         assign cfg_cas_latency  = 3'd3;
+    end
+    else begin: genclk
+        assign sdram_clk = clk;
+        assign sdram_clk_out = ~clk;
     end
 
 endgenerate

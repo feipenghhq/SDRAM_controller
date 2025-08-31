@@ -12,7 +12,10 @@ PROJECT ?= sdram
 TOP ?= top
 # verilog source files
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_controller.sv
-VERILOG += $(GIT_ROOT)/rtl/sdram/wbsdram.sv
+VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_init.sv
+VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_cmd.sv
+VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_ctrl.sv
+VERILOG += $(GIT_ROOT)/rtl/wbsdram/wbsdram.sv
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_25.v
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_50.v
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_100.v
@@ -24,7 +27,7 @@ VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag_ip.v
 VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag2wb.sv
 VERILOG += $(GIT_ROOT)/fpga/de2-115/top.sv
 # verilog include directory
-SEARCH ?=
+SEARCH += $(GIT_ROOT)/rtl/sdram
 # verilog define
 DEFINE ?=
 # sdc files
