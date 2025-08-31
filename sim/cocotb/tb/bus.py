@@ -12,15 +12,15 @@
 
 from cocotb.triggers import FallingEdge, RisingEdge, ReadWrite
 
-def bus_init(dut):
+def init_bus(dut):
     """
     Initialize the bus
     """
-    dut.bus_req_valid.value      = 0
-    dut.bus_req_write.value      = 0
-    dut.bus_req_addr.value       = 0
-    dut.bus_req_wdata.value      = 0
-    dut.bus_req_byteenable.value = 0
+    dut.req_valid.value      = 0
+    dut.req_write.value      = 0
+    dut.req_addr.value       = 0
+    dut.req_wdata.value      = 0
+    dut.req_byteenable.value = 0
 
 async def single_write(
     dut,
@@ -39,24 +39,24 @@ async def single_write(
     """
     # Address phase
     await ReadWrite()
-    dut.bus_req_valid.value      = 1
-    dut.bus_req_write.value      = 1
-    dut.bus_req_addr.value       = addr
-    dut.bus_req_wdata.value      = data
-    dut.bus_req_byteenable.value = byte_en
+    dut.req_valid.value      = 1
+    dut.req_write.value      = 1
+    dut.req_addr.value       = addr
+    dut.req_wdata.value      = data
+    dut.req_byteenable.value = byte_en
     # Wait for the ready
-    while not dut.bus_req_ready.value:
+    while not dut.req_ready.value:
         await RisingEdge(dut.clk)
         await ReadWrite()
 
     # Drive idle values after write request accepted
     await RisingEdge(dut.clk)
     await ReadWrite()
-    dut.bus_req_valid.value      = 0
-    dut.bus_req_write.value      = 0
-    dut.bus_req_addr.value       = 0
-    dut.bus_req_wdata.value      = 0
-    dut.bus_req_byteenable.value = 0
+    dut.req_valid.value      = 0
+    dut.req_write.value      = 0
+    dut.req_addr.value       = 0
+    dut.req_wdata.value      = 0
+    dut.req_byteenable.value = 0
 
 async def single_read(
     dut,
@@ -72,22 +72,22 @@ async def single_read(
     - byte_en: Byte enable
     """
     # Address phase
-    dut.bus_req_valid.value      = 1
-    dut.bus_req_write.value      = 0
-    dut.bus_req_addr.value       = addr
-    dut.bus_req_byteenable.value = byte_en
+    dut.req_valid.value      = 1
+    dut.req_write.value      = 0
+    dut.req_addr.value       = addr
+    dut.req_byteenable.value = byte_en
 
     # Wait for the ready
-    while not dut.bus_req_ready.value:
+    while not dut.req_ready.value:
         await RisingEdge(dut.clk)
         await ReadWrite()
 
     # Drive idle values after read request is accepted
     await RisingEdge(dut.clk)
     await ReadWrite()
-    dut.bus_req_valid.value      = 0
-    dut.bus_req_addr.value       = 0
-    dut.bus_req_byteenable.value = 0
+    dut.req_valid.value      = 0
+    dut.req_addr.value       = 0
+    dut.req_byteenable.value = 0
 
 async def single_read_resp(dut):
     """
@@ -99,8 +99,15 @@ async def single_read_resp(dut):
     await RisingEdge(dut.clk)
     await ReadWrite()
     # Wait for the rvalid
-    while not dut.bus_rsp_valid.value:
+    while not dut.rsp_valid.value:
         await RisingEdge(dut.clk)
         await ReadWrite()
-    data = dut.bus_rsp_rdata.value.integer
+    try:
+        data = dut.rsp_rdata.value.integer
+    except ValueError as e:
+        data = 0
+        dut.rsp_rdata._log.error(str(e))
+        await RisingEdge(dut.clk)
+        raise e
     return data
+

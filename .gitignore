@@ -5,6 +5,7 @@
 **.out
 **results.xml
 **sim_build
+**.log
 
 # Synthesis output
 **outputs

@@ -13,13 +13,10 @@
 
 `timescale 1ns/1ps
 
-`ifndef CLK_FREQ
-`define CLK_FREQ 133
-`endif
-
 module tb_sdram_controller;
     parameter DW = 16;
     parameter AW = 24;
+    parameter CLK_FREQ = 50;
 
     // Clock & reset
     logic          clk;
@@ -31,17 +28,17 @@ module tb_sdram_controller;
     logic [2:0]     cfg_cas_latency;
     logic           cfg_burst_mode;
 
-    // System bus_req
-    logic           bus_req_valid;
-    logic           bus_req_write;
-    logic [AW-1:0]  bus_req_addr;
-    logic [DW-1:0]  bus_req_wdata;
-    logic [1:0]     bus_req_byteenable;
-    logic           bus_req_ready;
+    // System req
+    logic           req_valid;
+    logic           req_write;
+    logic [AW-1:0]  req_addr;
+    logic [DW-1:0]  req_wdata;
+    logic [1:0]     req_byteenable;
+    logic           req_ready;
 
-    logic           bus_rsp_early_valid;
-    logic           bus_rsp_valid;
-    logic [DW-1:0]  bus_rsp_rdata;
+    logic           rsp_early_valid;
+    logic           rsp_valid;
+    logic [DW-1:0]  rsp_rdata;
 
     // SDRAM interface wires
     logic           sdram_clk;
@@ -55,12 +52,12 @@ module tb_sdram_controller;
     logic [1:0]     sdram_dqm;
     wire  [15:0]    sdram_dq;
 
-    localparam CLK_PERIOD = 1000 / `CLK_FREQ;
+    localparam CLK_PERIOD = 1000 / CLK_FREQ;
     localparam CLK_DELAY  = CLK_PERIOD - 1;
 
     always_comb sdram_clk <= #CLK_DELAY clk;
 
-    sdram_controller #(.CLK_FREQ(`CLK_FREQ))
+    sdram_controller #(.CLK_FREQ(CLK_FREQ))
     dut (
         .*
     );

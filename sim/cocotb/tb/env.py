@@ -7,39 +7,60 @@
 # Date Created: 07/18/2025
 #
 # -------------------------------------------------------------------
-# Environment
+# Test environment
 # -------------------------------------------------------------------
 
+import logging
 import cocotb
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.clock import Clock
 
-from bus import *
-from WbHostBFM import *
+#from bus import *
+#from WbHostBFM import *
 
 import os
 
-clk_freq = int(os.environ.get("FREQ", 50))
-clk_period = round(1000.0 / clk_freq, 1)
+def config_log():
+    # Create a file handler
+    file_handler = logging.FileHandler("cocotb.log")
+    file_handler.setLevel(logging.INFO)
+
+    # Format the logs
+    formatter = logging.Formatter('%(asctime)s [%(levelname)s] %(message)s')
+    file_handler.setFormatter(formatter)
+
+    # Add handler to cocotb logger
+    cocotb.log.addHandler(file_handler)
+    cocotb.log.setLevel(logging.INFO)  # log all levels
+
+config_log()
+
+def get_clk_period():
+    clk_freq = int(os.getenv('CLK_FREQ', 50))
+    clk_period = round(1000.0 / clk_freq, 1)
+    return clk_period
 
 def load_config(dut, burst_len=0, burst_type=0, cas=2, write_burst_mode=0):
     """
     Load the config signal
     """
+    clock_period = get_clk_period()
+    if clock_period > 10:
+        cas = 2
+    else:
+        cas = 3
     dut.cfg_burst_length.value  = burst_len
     dut.cfg_burst_type.value    = burst_type
     dut.cfg_cas_latency.value   = cas
     dut.cfg_burst_mode.value    = write_burst_mode
 
-async def init(dut, period=10.0, debug_model=False, bus='default'):
+async def init_env(dut, period=None, sdram_debug=False):
     """
-    Initialize the environment: setup clock, load the hack rom and reset the design
+    Initialize the environment: setup clock, reset the design
     """
-    _bus = None
-    if bus == 'default':
-        bus_init(dut)
-    elif bus == 'wishbone':
-        _bus = WbHostBFM(dut)
+    # get the clock period
+    if not period:
+        period = get_clk_period()
     # start clock
     cocotb.start_soon(Clock(dut.clk, period, units = 'ns').start()) # clock
     dut._log.info(f"Clock period is {period}")
@@ -48,49 +69,34 @@ async def init(dut, period=10.0, debug_model=False, bus='default'):
     await Timer(period * 5, units="ns")
     dut.rst_n.value = 1
     await RisingEdge(dut.clk)
-    if not debug_model:
+    if not sdram_debug:
         dut.sdram_model.Debug.value = 0
-    return _bus
 
-step_val = 0
-total_val = 0
-class Reporter:
+async def init_sdram(dut, wait_time = 100):
+    await Timer(wait_time, units='us')
+    # wait additional 10 clock cycle just in case
+    for _ in range(10):
+        await RisingEdge(dut.clk)
 
-    def __init__(self, log, prefix, total, bar_width=20, step=10):
-        """
-        Parameters:
-            log      -- cocotb logger (e.g., dut._log)
-            prefix   -- "WRITE", "READ", etc.
-            total    -- total count
-            bar_width -- width of the visual bar (default 20)
-            step     -- log every `step` percent
-        """
-        self.log = log
-        self.prefix = prefix
-        self.total = total
-        self.bar_width = bar_width
-        self.step = step
-        assert total > 0
-        self.index = 0
-        self.step_val = 0
-        self.step_thres = total * step / 100
+#async def init(dut, period=10.0, debug_model=False, bus='default'):
+#    """
+#    Initialize the environment: setup clock, load the hack rom and reset the design
+#    """
+#    _bus = None
+#    if bus == 'default':
+#        bus_init(dut)
+#    elif bus == 'wishbone':
+#        _bus = WbHostBFM(dut)
+#    # start clock
+#    cocotb.start_soon(Clock(dut.clk, period, units = 'ns').start()) # clock
+#    dut._log.info(f"Clock period is {period}")
+#    # generate reset
+#    dut.rst_n.value = 0
+#    await Timer(period * 5, units="ns")
+#    dut.rst_n.value = 1
+#    await RisingEdge(dut.clk)
+#    if not debug_model:
+#        dut.sdram_model.Debug.value = 0
+#    return _bus
 
-    def report_progress(self, delta=1):
-        """
-        Logs a progress to the cocotb logger.
 
-        Example output:
-        WRITE [██████░░░░░░░░░░] 30%
-        """
-
-        self.step_val += delta
-        self.index += delta
-        if self.step_val < self.step_thres:
-            return
-
-        self.step_val = 0
-        percent = int((self.index) * 100 / self.total)
-        filled = int(self.bar_width * percent / 100)
-        empty = self.bar_width - filled
-        bar = "█" * filled + "░" * empty
-        self.log.info(f"{self.prefix:<6} [{bar}] {percent:3d}%")

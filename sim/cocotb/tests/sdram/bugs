@@ -1,0 +1,6 @@
+1. cocotb_manual_precharge_test - FREQ=133
+    tb_sdram_controller.sdram_model : at time  201391.0 ns ERROR: tRAS violation during Precharge
+
+2. cocotb_random_test - FREQ=133
+    tb_sdram_controller.sdram_model : at time  151154.0 ns ERROR: tRAS violation during Precharge
+    tb_sdram_controller.sdram_model : at time  151169.0 ns ERROR: tRC violation during Activate bank 0
