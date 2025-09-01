@@ -62,6 +62,8 @@ module wbsdram #(
     inout  wire  [DW-1:0]   sdram_dq                // Data Input/Output bus.
 );
 
+    logic            wb_valid;
+
     logic            req_valid;
     logic            req_write;
     logic [AW-1:0]   req_addr;
@@ -75,16 +77,19 @@ module wbsdram #(
     logic            req_is_write;
     logic            req_is_read;
 
+    logic            req_sent;      // request is sent, waiting for completion
+
+    assign wb_valid = wb_cyc_i & wb_stb_i;
 
     // Wishbone to genetic bus
-    assign req_valid = wb_cyc_i & wb_stb_i;
+    assign req_valid = wb_valid & ~req_sent;
     assign req_write = wb_we_i;
     assign req_addr  = wb_adr_i;
     assign req_wdata = wb_dat_i;
     assign req_byteenable = wb_sel_i;
 
-    assign req_is_write = req_valid & req_write;
-    assign req_is_read  = req_valid & ~req_write;
+    assign req_is_write = wb_valid & req_write;
+    assign req_is_read  = wb_valid & ~req_write;
 
     assign wb_stall_o = (req_is_write & ~req_ready) | (req_is_read & ~rsp_early_valid);
     assign wb_dat_o   = rsp_rdata;
@@ -92,9 +97,12 @@ module wbsdram #(
     always @(posedge clk) begin
         if (!rst_n) begin
             wb_ack_o <= 1'b0;
+            req_sent <= 1'b0;
         end
         else begin
-            wb_ack_o <= req_valid & ~wb_stall_o;
+            wb_ack_o <= wb_valid & ~wb_stall_o;
+            if (req_valid && req_ready) req_sent <= 1'b1;
+            else if (!wb_stall_o) req_sent <= 1'b0;
         end
     end
 

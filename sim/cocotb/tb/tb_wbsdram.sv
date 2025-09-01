@@ -20,6 +20,7 @@
 module tb_wbsdram;
     parameter DW = 16;
     parameter AW = 24;
+    parameter CLK_FREQ = 50;
 
     // Clock & reset
     logic          clk;
@@ -54,12 +55,12 @@ module tb_wbsdram;
     logic [1:0]     sdram_dqm;
     wire  [15:0]    sdram_dq;
 
-    localparam CLK_PERIOD = 1000 / `CLK_FREQ;
+    localparam CLK_PERIOD = 1000 / CLK_FREQ;
     localparam CLK_DELAY  = CLK_PERIOD - 1;
 
     always_comb sdram_clk <= #CLK_DELAY clk;
 
-    wbsdram #(.CLK_FREQ(`CLK_FREQ))
+    wbsdram #(.CLK_FREQ(CLK_FREQ))
     dut (
         .*
     );

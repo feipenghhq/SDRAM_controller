@@ -10,15 +10,12 @@
 # Test environment
 # -------------------------------------------------------------------
 
+import os
 import logging
 import cocotb
 from cocotb.triggers import RisingEdge, Timer
 from cocotb.clock import Clock
 
-#from bus import *
-#from WbHostBFM import *
-
-import os
 
 def config_log():
     # Create a file handler
@@ -77,26 +74,4 @@ async def init_sdram(dut, wait_time = 100):
     # wait additional 10 clock cycle just in case
     for _ in range(10):
         await RisingEdge(dut.clk)
-
-#async def init(dut, period=10.0, debug_model=False, bus='default'):
-#    """
-#    Initialize the environment: setup clock, load the hack rom and reset the design
-#    """
-#    _bus = None
-#    if bus == 'default':
-#        bus_init(dut)
-#    elif bus == 'wishbone':
-#        _bus = WbHostBFM(dut)
-#    # start clock
-#    cocotb.start_soon(Clock(dut.clk, period, units = 'ns').start()) # clock
-#    dut._log.info(f"Clock period is {period}")
-#    # generate reset
-#    dut.rst_n.value = 0
-#    await Timer(period * 5, units="ns")
-#    dut.rst_n.value = 1
-#    await RisingEdge(dut.clk)
-#    if not debug_model:
-#        dut.sdram_model.Debug.value = 0
-#    return _bus
-
 

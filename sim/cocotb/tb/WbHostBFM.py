@@ -133,7 +133,7 @@ class WbHostBFM:
         self.wb_adr_o.value = 0
         self.wb_dat_o.value = 0
         assert self.wb_ack_i.value == 1, self.dut._log.error("[WB Host BFM] ack should be at high")
-        data = self.wb_dat_i.value
+        data = self.wb_dat_i.value.integer
         if info:
             self.dut._log.info(f"[WB Host BFM] Read Complete. Data: {hex(data)}")
         # de-assert cyc
