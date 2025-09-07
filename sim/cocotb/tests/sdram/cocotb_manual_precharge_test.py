@@ -25,7 +25,7 @@ def addr_gen(bank, row, col, raw=12, caw=10):
     return ((bank << (raw + caw)) | (row << caw) | col)
 
 @cocotb.test()
-async def write(dut, num=4):
+async def write_mp(dut, num=4):
     """
     test write request targeting different bank to trigger precharge
     """
@@ -41,7 +41,7 @@ async def write(dut, num=4):
     await Timer(1, units='us')
 
 @cocotb.test()
-async def read(dut, num=4, debug=True):
+async def read_mp(dut, num=4, debug=True):
     """
     test read request targeting different bank to trigger precharge
     """

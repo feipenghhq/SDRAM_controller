@@ -41,6 +41,38 @@ async def write2read(dut, addr0, addr1):
     assert data1 == rdata
     await Timer(1, units='us')
 
+async def read2write(dut, addr0, addr1):
+    """
+    Test read followed by a write
+    """
+    await init(dut, sdram_debug=True)
+    data0 = random.randint(0, 1 << 15)
+    data1 = random.randint(0, 1 << 15)
+    await single_write(dut, addr1, data1, 0x3)
+    await single_read(dut, addr1, 0x3)
+    await single_write(dut, addr0, data0, 0x3)
+    rdata = await single_read_resp(dut)
+    assert data1 == rdata
+    await Timer(1, units='us')
+
+async def read2read(dut, addr0, addr1):
+    """
+    Test read followed by a write
+    """
+    await init(dut, sdram_debug=True)
+    data0 = random.randint(0, 1 << 15)
+    data1 = random.randint(0, 1 << 15)
+    await single_write(dut, addr0, data0, 0x3)
+    await single_write(dut, addr1, data1, 0x3)
+    await single_read(dut, addr0, 0x3)
+    await single_read(dut, addr1, 0x3)
+    rdata = await single_read_resp(dut)
+    assert data0 == rdata
+    rdata = await single_read_resp(dut)
+    assert data1 == rdata
+    await Timer(1, units='us')
+
+
 @cocotb.test()
 async def w2w_sr(dut):
     """Write 2 write with same row"""
@@ -60,3 +92,23 @@ async def w2r_sr(dut):
 async def w2r_dr(dut):
     """Write 2 read with different row"""
     await write2read(dut, 0x100, 0x1000)
+
+@cocotb.test()
+async def r2w_sr(dut):
+    """Read 2 write with same row"""
+    await read2write(dut, 0x100, 0x200)
+
+@cocotb.test()
+async def r2w_dr(dut):
+    """Read 2 write with diff row"""
+    await read2write(dut, 0x100, 0x1000)
+
+@cocotb.test()
+async def r2r_sr(dut):
+    """Read 2 read with same row"""
+    await read2read(dut, 0x100, 0x200)
+
+@cocotb.test()
+async def r2r_dr(dut):
+    """Read 2 read with diff row"""
+    await read2read(dut, 0x100, 0x1000)

@@ -17,8 +17,9 @@ from Reporter import Reporter
 import random
 import cocotb
 from cocotb.triggers import Timer
+from cocotb.regression import TestFactory
 
-@cocotb.test()
+#@cocotb.test()
 async def random_read_write(dut, num_op=1000, num_seq=100):
     """
     Test Random read and write. Will issue write first and then read from the location
@@ -69,3 +70,8 @@ async def random_read_write(dut, num_op=1000, num_seq=100):
         reporter.report_progress()
     await Timer(1, units='us')
     dut._log.info(f"Completed all the Operations!")
+
+random_factory = TestFactory(random_read_write)
+random_factory.add_option("num_op", [1000])
+random_factory.add_option("num_seq", [100])
+random_factory.generate_tests()

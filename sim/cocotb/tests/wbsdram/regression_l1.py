@@ -7,7 +7,7 @@
 # Date Created: 07/21/2025
 #
 # -------------------------------------------------------------------
-# Regression Test
+# Regression L1 Test
 # -------------------------------------------------------------------
 
 from cocotb_random_test import random_read_write

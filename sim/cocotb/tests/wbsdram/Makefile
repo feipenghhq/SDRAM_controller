@@ -22,7 +22,9 @@ VERILOG_SOURCES += $(REPO)/sim/cocotb/model/MT48LC8M16A2.v
 VERILOG_INCLUDE_DIRS += $(REPO)/rtl/sdram
 
 COMPILE_ARGS    += -D SIMULATION=1
-COMPILE_ARGS    += -P tb_sdram_controller.CLK_FREQ=$(CLK_FREQ)
+COMPILE_ARGS    += -P tb_wbsdram.CLK_FREQ=$(CLK_FREQ)
+
+export CLK_FREQ := $(CLK_FREQ)
 
 sim: clean
 include $(shell cocotb-config --makefiles)/Makefile.sim

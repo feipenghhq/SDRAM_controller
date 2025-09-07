@@ -67,9 +67,9 @@ async def single_read(
     Issue a single-beat read request. (Request only. Does not receive the read data)
 
     Parameters:
-    - dut: The DUT handle
-    - addr: Read address (int)
-    - byte_en: Byte enable
+        - dut: The DUT handle
+        - addr: Read address (int)
+        - byte_en: Byte enable
     """
     # Address phase
     dut.req_valid.value      = 1
@@ -94,7 +94,7 @@ async def single_read_resp(dut):
     Receive one read data
 
     Parameters:
-    - dut: The DUT handle
+        - dut: The DUT handle
     """
     await RisingEdge(dut.clk)
     await ReadWrite()
@@ -111,3 +111,28 @@ async def single_read_resp(dut):
         raise e
     return data
 
+async def read_resp(dut, n):
+    """
+    Receive N read data
+
+    Parameters:
+        - dut: The DUT handle
+        - n: number of read data to return
+    """
+    data_list = []
+    for i in range(n):
+        await RisingEdge(dut.clk)
+        await ReadWrite()
+        # Wait for the rvalid
+        while not dut.rsp_valid.value:
+            await RisingEdge(dut.clk)
+            await ReadWrite()
+        try:
+            data = dut.rsp_rdata.value.integer
+        except ValueError as e:
+            data = 0
+            dut.rsp_rdata._log.error(str(e))
+            await RisingEdge(dut.clk)
+            raise e
+        data_list.append(data)
+    return data_list

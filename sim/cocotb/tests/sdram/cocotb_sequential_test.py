@@ -15,12 +15,13 @@ from Reporter import  Reporter
 
 import random
 import cocotb
-from cocotb.triggers import Timer
+from cocotb.regression import TestFactory
 
-@cocotb.test()
+#@cocotb.test()
 async def sequential_read_write(dut, start_addr=0, end_addr=0x1000):
     """
     Test sequential read and write. Will issue write first and then read from the location
+    Read will be pipelined meaning a new read request will be continuously before the read data is returned
     """
 
     # generate random  data
@@ -41,13 +42,19 @@ async def sequential_read_write(dut, start_addr=0, end_addr=0x1000):
         reporter.report_progress()
 
     # sequential read
+    read_resp_fork = cocotb.start_soon(read_resp(dut, num))
     for i in range(num):
         addr = start_addr + i * 2
-        read_resp = cocotb.start_soon(single_read_resp(dut))
         await single_read(dut, addr, 0x3)
-        rdata = await read_resp
-        assert rdata == data[i], dut._log.error(f'Addr: {hex(addr)}. Expected {hex(data[i])}. Actual {hex(rdata)}.')
         reporter.report_progress()
-    await Timer(1, units='us')
+
+    rdata_list = await read_resp_fork
+    for i in range(num):
+        assert rdata_list[i] == data[i], dut._log.error(f'Addr: {hex(addr)}. Expected {hex(data[i])}. Actual {hex(rdata_list[i])}.')
+
     dut._log.info(f"Completed all the Operations!")
-    await read_resp
+
+sequential_factory = TestFactory(sequential_read_write)
+sequential_factory.add_option("start_addr", [0])
+sequential_factory.add_option("end_addr",   [0x1000])
+sequential_factory.generate_tests()

@@ -32,7 +32,7 @@ if tb_path not in sys.path:
 
 # Import required functions
 from env import init_env, init_sdram, load_config
-from bus import init_bus, single_write, single_read, single_read_resp
+from bus import init_bus, single_write, single_read, single_read_resp, read_resp
 
 # Initialization
 async def init(dut, sdram_debug=False):

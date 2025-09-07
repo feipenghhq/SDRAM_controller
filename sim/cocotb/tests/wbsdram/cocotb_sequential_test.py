@@ -17,8 +17,9 @@ from Reporter import Reporter
 import random
 import cocotb
 from cocotb.triggers import Timer
+from cocotb.regression import TestFactory
 
-@cocotb.test()
+#@cocotb.test()
 async def sequential_read_write(dut, start_addr=0, end_addr=0x1000):
     """
     Test sequential read and write. Will issue write first and then read from the location
@@ -47,6 +48,11 @@ async def sequential_read_write(dut, start_addr=0, end_addr=0x1000):
         rdata = await bus.single_read(addr, 0x3)
         assert rdata == data[i], dut._log.error(f"Wrong read data at address {hex(addr)}. Expected: {hex(rdata)}. Actual: {hex(data[i])}")
         reporter.report_progress()
-        
+
     await Timer(1, units='us')
     dut._log.info(f"Completed all the Operations!")
+
+sequential_factory = TestFactory(sequential_read_write)
+sequential_factory.add_option("start_addr", [0])
+sequential_factory.add_option("end_addr",   [0x1000])
+sequential_factory.generate_tests()

@@ -16,7 +16,7 @@ import cocotb
 from cocotb.triggers import Timer
 
 @cocotb.test()
-async def write(dut):
+async def simple_write(dut):
     """
     Test Single Write request
     """
@@ -27,7 +27,7 @@ async def write(dut):
     await Timer(1, units='us')
 
 @cocotb.test()
-async def read(dut):
+async def simple_read(dut):
     """
     Test read request
     """

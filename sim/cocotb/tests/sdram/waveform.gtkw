@@ -1,19 +1,19 @@
 [*]
 [*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
-[*] Sat Aug 30 23:43:23 2025
+[*] Sun Sep  7 06:00:01 2025
 [*]
 [dumpfile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/sdram/sim_build/tb_sdram_controller.fst"
-[dumpfile_mtime] "Sat Aug 30 23:42:37 2025"
-[dumpfile_size] 124401
+[dumpfile_mtime] "Sun Sep  7 05:59:35 2025"
+[dumpfile_size] 131406
 [savefile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/sdram/waveform.gtkw"
-[timestart] 0
-[size] 3370 1243
+[timestart] 172398300
+[size] 3366 1240
 [pos] -1 -1
-*-21.000000 3930000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+*-16.000000 116009000 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
 [treeopen] tb_sdram_controller.
 [treeopen] tb_sdram_controller.dut.
 [sst_width] 388
-[signals_width] 420
+[signals_width] 324
 [sst_expanded] 1
 [sst_vpaned_height] 253
 @28
@@ -25,6 +25,9 @@ tb_sdram_controller.clk
 -
 @28
 tb_sdram_controller.dut.u_sdram_ctrl.req_valid
+@29
+tb_sdram_controller.dut.u_sdram_ctrl.req_ready
+@28
 tb_sdram_controller.dut.u_sdram_ctrl.req_write
 @22
 tb_sdram_controller.dut.u_sdram_ctrl.req_addr[23:0]
@@ -38,6 +41,7 @@ tb_sdram_controller.dut.u_sdram_ctrl.rsp_rdata[15:0]
 -
 -SDRAM
 @28
+tb_sdram_controller.sdram_model.Sys_clk
 tb_sdram_controller.sdram_cke
 tb_sdram_controller.sdram_cs_n
 tb_sdram_controller.sdram_ras_n
@@ -68,25 +72,25 @@ tb_sdram_controller.sdram_dqm[1:0]
 tb_sdram_controller.sdram_dq[15:0]
 @200
 -
--SDRAM
-@28
-tb_sdram_controller.sdram_model.Sys_clk
-@200
--
--INTERNAL
+-SDRAM_CTRL
 @22
 tb_sdram_controller.dut.u_sdram_init.init_state[3:0]
-@821
-tb_sdram_controller.dut.u_sdram_ctrl.sdram_state_str[95:0]
+@24
+tb_sdram_controller.dut.u_sdram_ctrl.sdram_state[1:0]
+@820
+tb_sdram_controller.dut.u_sdram_ctrl.sdram_operation_string[95:0]
+@28
+tb_sdram_controller.dut.u_sdram_ctrl.req_valid_q
+tb_sdram_controller.dut.u_sdram_ctrl.ref_req
 @200
 -
--cmd
+-SDRAM_CMD
 @28
 tb_sdram_controller.dut.u_sdram_cmd.cmd_valid
-tb_sdram_controller.dut.u_sdram_cmd.cmd_type[3:0]
+tb_sdram_controller.dut.u_sdram_init.cmd_ready
+tb_sdram_controller.dut.u_sdram_ctrl.write_ready
 tb_sdram_controller.dut.u_sdram_cmd.cmd_done
-tb_sdram_controller.dut.u_sdram_cmd.cmd_wip
-@22
-tb_sdram_controller.dut.u_sdram_cmd.cmd_cnt[3:0]
+tb_sdram_controller.dut.u_sdram_cmd.cmd_type[3:0]
+tb_sdram_controller.dut.u_sdram_cmd.cmd_take_1cycle
 [pattern_trace] 1
 [pattern_trace] 0
