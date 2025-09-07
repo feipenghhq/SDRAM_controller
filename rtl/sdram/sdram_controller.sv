@@ -81,9 +81,13 @@ logic [RAW-1:0]  cmd_addr;
 logic [DW-1:0]   cmd_data;
 logic [1:0]      cmd_ba;
 logic [DW/8-1:0] cmd_dqm;
-logic            cmd_wip;
+logic            cmd_ready;
 logic            cmd_done;
 logic            cmd_early_done;
+
+logic            active_ready;
+logic            write_ready;
+logic            precharge_ready;
 
 // mux select between init command and ctrl command
 assign cmd_valid = init_done ? ctrl_valid : init_valid;
@@ -108,7 +112,7 @@ u_sdram_init
     .init_cmd         (init_cmd),
     .init_addr        (init_addr),
     .init_done        (init_done),
-    .cmd_wip          (cmd_wip),
+    .cmd_ready        (cmd_ready),
     .cmd_done         (cmd_done)
 );
 
@@ -131,8 +135,10 @@ u_sdram_ctrl (
     .cmd_ba             (ctrl_ba),
     .cmd_dqm            (ctrl_dqm),
     .cmd_done           (cmd_done),
-    .cmd_early_done     (cmd_early_done),
-    .cmd_wip            (cmd_wip),
+    .cmd_ready          (cmd_ready),
+    .precharge_ready    (precharge_ready),
+    .active_ready       (active_ready),
+    .write_ready        (write_ready),
     .cfg_burst_length   (cfg_burst_length),
     .cfg_burst_type     (cfg_burst_type),
     .cfg_cas_latency    (cfg_cas_latency),
@@ -171,9 +177,11 @@ u_sdram_cmd(
     .cmd_data        (cmd_data),
     .cmd_ba          (cmd_ba),
     .cmd_dqm         (cmd_dqm),
-    .cmd_wip         (cmd_wip),
+    .cmd_ready       (cmd_ready),
     .cmd_done        (cmd_done),
-    .cmd_early_done  (cmd_early_done),
+    .precharge_ready (precharge_ready),
+    .active_ready    (active_ready),
+    .write_ready     (write_ready),
     .cfg_cas_latency (cfg_cas_latency),
     .sdram_cke       (sdram_cke),
     .sdram_cs_n      (sdram_cs_n),

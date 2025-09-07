@@ -7,7 +7,10 @@
 // Date Created: 08/26/2025
 //
 // -------------------------------------------------------------------
-// Generate SDRAM command to the SDRAM chip meeting required timing
+// Functions:
+//  - Generate SDRAM command to the SDRAM chip meeting required timing
+//  - Keep track of the the timing requirement of the SDRAM chip
+//  - Generate indicator to the above timing requirement
 // -------------------------------------------------------------------
 
 `include "sdram_inc.svh"
@@ -35,9 +38,13 @@ module sdram_cmd #(
     input  logic [DW-1:0]   cmd_data,
     input  logic [1:0]      cmd_ba,
     input  logic [DW/8-1:0] cmd_dqm,
-    output logic            cmd_wip,
+    output logic            cmd_ready,
     output logic            cmd_done,
-    output logic            cmd_early_done,
+
+    // signal to indicate if the timing is meet to perform the operation
+    output logic            precharge_ready,
+    output logic            active_ready,
+    output logic            write_ready,
 
     input  logic [2:0]      cfg_cas_latency,
 
@@ -67,25 +74,28 @@ localparam cWR  = `SDRAM_CEIL_DIV(tWR  * CLK_FREQ, 1000);   // (CLK Cycle) WRITE
 localparam cMRD = 3;                                        // (cycle) LOAD MODE REGISTER cycle. JEDEC specify 3 clocks.
 
 // Command counter width
-localparam CMD_CNT_WIDTH = 4;
-
-/////////////////////////////////////////////////
-// State Machine Declaration
-/////////////////////////////////////////////////
-
-typedef enum logic [3:0] {
-    IDLE,          // IDLE state, no command to send.
-    CMD,           // Send the command to the SDRAM chip.
-    WAIT           // Wait for the command timing.
-} cmd_state_t;
+localparam MAX_CYCLE = `MAX4(cRAS, cRC, cRFC, 4); // 4 is for CL + 1 = (3+1) = 4 (assuming CL=3)
+localparam CMD_CNT_WIDTH = $clog2(MAX_CYCLE+1);
 
 /////////////////////////////////////////////////
 // Signal Declaration
 /////////////////////////////////////////////////
 
-cmd_state_t cmd_state, cmd_state_next;
-logic                     new_cmd;
+logic                     cmd_fire;
+
+// counter for command that might take more then one cycles
+logic [CMD_CNT_WIDTH-1:0] cmd_cycle;
 logic [CMD_CNT_WIDTH-1:0] cmd_cnt;
+logic                     cmd_take_1cycle;
+
+// counter for various sdram timing parameter
+logic [CMD_CNT_WIDTH-1:0] cnt_RAS, cnt_RC, cnt_WR, cnt_RL;
+logic                     meet_RAS, meet_RC, meet_WR, meet_RL;
+logic [CMD_CNT_WIDTH-1:0] read_to_write_cycle;
+
+logic                     cmd_is_active;
+logic                     cmd_is_write;
+logic                     cmd_is_read;
 
 logic                     sdram_dq_out_en; // enable dq output
 logic [DW-1:0]            sdram_dq_out;
@@ -94,29 +104,97 @@ logic [DW-1:0]            sdram_dq_out;
 // Main logic
 /////////////////////////////////////////////////
 
+assign cmd_fire = cmd_valid & cmd_ready;
+
+// cmd counter is used to meet sdram timing for a command
+// - auto_refresh (tRFC) / precharge (tRP) / active (tRCD):
+//      * these commands may take more then 1 clock cycle depending on the clock frequency
+// - write / read:
+//      * these commands are considered to always take 1 clock cycle.
+//      * Additional counters are used to meet other related timing including tRAS, tRC, tWR
+
+always_comb begin
+    cmd_cycle = 0;
+    case(cmd_type)
+        `CMD_PRECHARGE: cmd_cycle = cRP [CMD_CNT_WIDTH-1:0];
+        `CMD_REFRESH:   cmd_cycle = cRFC[CMD_CNT_WIDTH-1:0];
+        `CMD_LMR:       cmd_cycle = cMRD[CMD_CNT_WIDTH-1:0];
+        `CMD_ACTIVE:    cmd_cycle = cRCD[CMD_CNT_WIDTH-1:0];
+        `CMD_WRITE:     cmd_cycle = 'b1;    // write only takes 1 cycle
+        `CMD_READ:      cmd_cycle = 'b1;    // read also takes 1 cycle
+        `CMD_NOP:       cmd_cycle = 'b1;
+        `CMD_DESL:      cmd_cycle = 'b1;
+        default:        cmd_cycle = 'b1;
+    endcase
+end
+
+always_ff @(posedge clk) begin
+    if (!rst_n) cmd_cnt <= 'b0;
+    else if (cmd_fire) cmd_cnt <= cmd_cycle - 1'b1 - 1'b1; // -1 to make it end with 0,
+                                                           // then - 1 as the current cycle is counted as one cycle
+    else if (cmd_cnt >0 ) cmd_cnt <= cmd_cnt - 1'b1;
+end
+
 always_ff @(posedge clk) begin
     if (!rst_n) begin
-        cmd_cnt <= 'b0;
+        cmd_ready <= 1'b0;
     end
     else begin
-        // load the counter when a new command is issue. otherwise decrease the counter till it reach 0.
-        if (cmd_valid) begin
-            case(cmd_type)
-                `CMD_PRECHARGE: cmd_cnt <= cRP [CMD_CNT_WIDTH-1:0] - 1'b1;
-                `CMD_REFRESH:   cmd_cnt <= cRFC[CMD_CNT_WIDTH-1:0] - 1'b1;
-                `CMD_LMR:       cmd_cnt <= cMRD[CMD_CNT_WIDTH-1:0] - 1'b1;
-                `CMD_ACTIVE:    cmd_cnt <= cRCD[CMD_CNT_WIDTH-1:0] - 1'b1;
-                `CMD_WRITE:     cmd_cnt <= cWR [CMD_CNT_WIDTH-1:0] - 1'b1;
-                `CMD_READ:      cmd_cnt <= cfg_cas_latency + 1'b1;
-            endcase
-        end
-        else if (cmd_cnt > 0) cmd_cnt <= cmd_cnt - 1'b1;
+        // command can't complete in 1 cycle, de-assert cmd_ready in the next cycle
+        if (cmd_fire & !cmd_take_1cycle) cmd_ready <= 1'b0;
+        // re-assert cmd_ready after cmd is completed in the next cycle
+        else if (cmd_done) cmd_ready <= 1'b1;
     end
 end
 
-assign cmd_done = cmd_cnt == 0;
-assign cmd_early_done = cmd_cnt == 1;
-assign cmd_wip  = !cmd_done;
+assign cmd_take_1cycle = cmd_cycle == 1;
+
+assign cmd_done = ( cmd_fire & cmd_take_1cycle) |           // for command takes 1 cycle, complete in the current cycle
+                  (~cmd_fire & ~cmd_ready & cmd_cnt == 0);  // for command takes > 1 cycle, complete in last cycle
+                                                            // ~cmd_ready indicate there are valid command in progress
+
+// Additional counter to make sure the operation meet key sdram timing including:
+// ACTIVE -> PRECHARGE:  tRAS
+// ACTIVE -> ACTIVE:     tRC
+// WRITE  -> PRECHARGE:  tWR
+// READ   -> WRITE:      RL + additional 1 cycle
+
+assign cmd_is_active = cmd_valid && cmd_type == `CMD_ACTIVE;
+assign cmd_is_write = cmd_valid && cmd_type == `CMD_WRITE;
+assign cmd_is_read = cmd_valid && cmd_type == `CMD_READ;
+
+assign read_to_write_cycle = cfg_cas_latency + 1'b1;
+
+always_ff @(posedge clk) begin
+    if (!rst_n) begin
+        cnt_RAS <= 'b0;
+        cnt_RC <= 'b0;
+        cnt_WR <= 'b0;
+        cnt_RL <= 'b0;
+    end
+    else begin
+        if (cmd_is_active) cnt_RAS <= cRAS[CMD_CNT_WIDTH-1:0] - 1'b1;
+        else if (cnt_RAS != 0) cnt_RAS <= cnt_RAS - 1'b1;
+
+        if (cmd_is_active) cnt_RC <= cRC[CMD_CNT_WIDTH-1:0] - 1'b1;
+        else if (cnt_RC != 0) cnt_RC <= cnt_RC - 1'b1;
+
+        if (cmd_is_write) cnt_WR <= cWR[CMD_CNT_WIDTH-1:0] - 1'b1;
+        else if (cnt_WR != 0) cnt_WR <= cnt_WR - 1'b1;
+
+        if (cmd_is_read) cnt_RL <= read_to_write_cycle - 1'b1;
+        else if (cnt_RL != 0) cnt_RL <= cnt_RL - 1'b1;
+    end
+end
+
+assign meet_RAS = (cRAS == 1) ? 1'b1 : cnt_RAS == 0;
+assign meet_RC = (cRC == 1) ? 1'b1 : cnt_RC == 0;
+assign meet_WR = (cWR == 1) ? 1'b1 : cnt_WR == 0;
+assign meet_RL = ((cfg_cas_latency + 1'b1) == 1) ? 1'b1 : cnt_RL == 0;
+
+assign active_ready = meet_RC;
+assign precharge_ready = meet_RAS & meet_WR;
+assign write_ready = meet_RL;
 
 // Register the SDRAM output
 always_ff @(posedge clk) begin

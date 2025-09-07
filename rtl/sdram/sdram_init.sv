@@ -30,7 +30,7 @@ module sdram_init #(
     output logic [3:0]      init_cmd,           // Initialization command type
     output logic [AW-1:0]   init_addr,          // Initialization command address
     input  logic            cmd_done,           // Command completion flag
-    input  logic            cmd_wip,            // Command in progress
+    input  logic            cmd_ready,          // Command ready
 
     output logic            init_done           // Initialization process done
 );
@@ -123,12 +123,12 @@ assign wait_done = init_cnt == 0;
 // output function logic
 always_comb begin
 
-    init_valid = ~cmd_wip;      // default init_valid to 1
+    init_valid = cmd_ready;
     init_cmd   = `CMD_NOP;
     init_addr  = 'b0;
     init_done  = 1'b0;
 
-    case(init_state_next)
+    case(init_state)
         IDLE: begin
             init_cmd = `CMD_DESL;
         end

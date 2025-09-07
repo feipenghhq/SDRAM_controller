@@ -28,4 +28,8 @@
 // Ceil division
 `define SDRAM_CEIL_DIV(a, b) ((a) + (b) - 1) / (b)
 
+// Max
+`define MAX2(a, b) ((a) > (b) ? (a) : (b))
+`define MAX4(a, b, c, d) (`MAX2(`MAX2(a, b), `MAX2(c, d)))
+
 `endif

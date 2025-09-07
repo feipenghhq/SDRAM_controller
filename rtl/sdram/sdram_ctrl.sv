@@ -34,9 +34,12 @@ module sdram_ctrl #(
     output logic [DW-1:0]   cmd_data,
     output logic [1:0]      cmd_ba,
     output logic [DW/8-1:0] cmd_dqm,
+    input  logic            cmd_ready,
     input  logic            cmd_done,
-    input  logic            cmd_early_done,
-    input  logic            cmd_wip,
+
+    input  logic            precharge_ready,
+    input  logic            active_ready,
+    input  logic            write_ready,
 
     // SDRAM Config
     input  logic [2:0]      cfg_burst_length,   // SDRAM Mode register: Burst Length
@@ -72,7 +75,6 @@ localparam BW        = $clog2(NUM_BYTE); // Address With to select the byte
 
 localparam REFRESH_INTERVAL = (tREF * 1000 * CLK_FREQ / ROW_COUNT); // Refresh counter threshold
 localparam REF_CNT_WIDTH = $clog2(REFRESH_INTERVAL);
-localparam CMD_CNT_WIDTH = 4; // Command counter width
 
 localparam RD_SF_WIDTH = 5; // Read shift register width
 
@@ -81,16 +83,11 @@ localparam RD_SF_WIDTH = 5; // Read shift register width
 /////////////////////////////////////////////////
 
 // SDRAM Main Control State Machine
-typedef enum logic [3:0] {
-    RESET,        // Start up State
-    INIT,         // SDRAM initialization
-    MODE_REG_SET, // Mode Register set
-    IDLE,         // IDLE state (after bank have been pre-charged)
-    ROW_ACTIVE,   // Active a row
-    WRITE,        // Write without auto precharge
-    READ,         // Read without auto precharge
-    PRECHARGE,    // Precharge the bank
-    AUTO_REFRESH  // Auto Refresh
+typedef enum logic [1:0] {
+    RESET,  // Start up State
+    INIT,   // SDRAM initialization
+    ACCESS, // Access SDRAM
+    REFRESH // Access SDRAM
 } sdram_state_t;
 
 /////////////////////////////////////////////////
@@ -99,76 +96,68 @@ typedef enum logic [3:0] {
 
 // main state machine
 sdram_state_t               sdram_state, sdram_state_next;
-logic                       s_RESET;
 logic                       s_INIT;
-logic                       s_IDLE;
-logic                       s_ROW_ACTIVE;
-logic                       s_WRITE;
-logic                       s_READ;
-logic                       s_PRECHARGE;
-logic                       s_AUTO_REFRESH;
-logic                       arc_RESET_to_INIT;
-logic                       arc_INIT_to_IDLE;
-logic                       arc_IDLE_to_ROW_ACTIVE;
-logic                       arc_IDLE_to_PRECHARGE;
-logic                       arc_IDLE_to_READ;
-logic                       arc_IDLE_to_WRITE;
-logic                       arc_ROW_ACTIVE_to_WRITE;
-logic                       arc_ROW_ACTIVE_to_READ;
-logic                       arc_WRITE_to_IDLE;
-logic                       arc_WRITE_to_WRITE;
-logic                       arc_WRITE_to_READ;
-logic                       arc_WRITE_to_PRECHARGE;
-logic                       arc_READ_to_IDLE;
-logic                       arc_PRECHARGE_to_AUTO_REFRESH;
-logic                       arc_PRECHARGE_to_ROW_ACTIVE;
-logic                       arc_AUTO_REFRESH_to_IDLE;
-logic                       arc_AUTO_REFRESH_to_ROW_ACTIVE;
-logic                       to_IDLE;
-logic                       to_ROW_ACTIVE;
-logic                       to_READ;
-logic                       to_WRITE;
-logic                       to_PRECHARGE;
-logic                       to_REFRESH;
+logic                       s_ACCESS;
+logic                       s_REFRESH;
 
 // registered input request
-logic                       req_read_q;
+logic                       req_valid_q;
 logic                       req_write_q;
 logic [AW-1:0]              req_addr_q;
 logic [DW-1:0]              req_wdata_q;
 logic [DW/8-1:0]            req_byteenable_q;
 
+// input bus status
 logic                       req_act;            // bus request is accepted
 logic                       req_done;           // bus request complete
-logic                       int_req;            // internal bus request pending
 
-// Address mapping to sdram {bank, row, col}
-logic [1:0]                 bank;               // band address
-logic [RAW-1:0]             row;                // row address
-logic [CAW-1:0]             col;                // column address
+// Address mapping to sdram bank, row, col
+logic [1:0]                 bank;
+logic [RAW-1:0]             row;
+logic [CAW-1:0]             col;
+logic [RAW-1:0]             addr_col;           // sdram column address
 
 // Refresh counter
 logic [REF_CNT_WIDTH-1:0]   ref_cnt;
 logic                       ref_req;
 
 // CL counter to indicate read data ready
-logic                       cmd_is_read;
+logic                       read_req_send;
 logic [RD_SF_WIDTH-1:0]     read_valid_pipe;    // Read valid pipeline
 
-// SDRAM bank/row status
-logic                       row_active_done;
+// SDRAM status indicator
+logic                       row_activated;      // indicate a row is activated
+logic                       precharged;         // indicate precharge is done and no row is activated
+logic [RAW+1:0]             activated_bank_row; // activated bank and row
+logic [RAW+1:0]             request_bank_row;   // request bank and row
 logic                       precharge_done;
-logic                       bank_precharged;    // indicate a precharge has already been performed
-logic [RAW+1:0]             active_ba_row;      // activated bank and row
-logic [RAW+1:0]             next_ba_row;        // next bank and row
-logic                       open_new_row;       // new request need to open a new row
+logic                       row_active_done;
+logic                       open_new_row;       // request need to open a new row
 
-// misc
-logic [RAW-1:0]             addr_col;           // sdram column address
+// sdram command for arbitration
+logic                       access_precharge;
+logic                       access_active;
+logic                       access_write;
+logic                       access_read;
+logic                       refresh_precharge;
+logic                       refresh_refresh;
+
+// granted sdram command
+logic                       grant_precharge;
+logic                       grant_refresh;
+logic                       grant_active;
+logic                       grant_write;
+logic                       grant_read;
+
+// state status
+logic                       access_done;
+logic                       refresh_done;
+
+logic                       init_done_q;        // delay init_done by 1 cycle to match with state transition
 
 /////////////////////////////////////////////////
 // Main logic
-/////////////////////////////////////////////////
+/////////////////////////////////////////////////G
 
 // ----------------------------------------------
 // Input and Output Register for the system bus
@@ -177,78 +166,31 @@ logic [RAW-1:0]             addr_col;           // sdram column address
 // register the input request
 always_ff @(posedge clk) begin
     if (!rst_n) begin
-        req_read_q   <= 1'b0;
-        req_write_q  <= 1'b0;
+        req_valid_q <= 1'b0;
     end
     else begin
-        if (req_act) begin
-            req_read_q   <= ~req_write;
-            req_write_q  <= req_write;
-        end
-        else if (req_done) begin
-            req_read_q   <= 1'b0;
-            req_write_q  <= 1'b0;
-        end
+        if (req_act) req_valid_q <= req_valid;
+        else if (req_done) req_valid_q <= 1'b0;
     end
 end
 
 always_ff @(posedge clk) begin
     if (req_act) begin
+        req_write_q      <= req_write;
         req_addr_q       <= req_addr;
         req_wdata_q      <= req_wdata;
         req_byteenable_q <= req_byteenable;
     end
 end
 
-assign req_ready = (~int_req & ~s_RESET & ~s_INIT) | req_done;   // TBD: Make this flopped version for better timing
-
-always_ff @(posedge clk) begin
-   rsp_rdata <= sdram_dq_in;
-end
-
-assign rsp_early_valid = cfg_cas_latency == 2 ? read_valid_pipe[RD_SF_WIDTH-3] : read_valid_pipe[RD_SF_WIDTH-2];
-assign rsp_valid       = cfg_cas_latency == 2 ? read_valid_pipe[RD_SF_WIDTH-2] : read_valid_pipe[RD_SF_WIDTH-1];
-
 // ----------------------------------------------
 // Main state machine
 // ----------------------------------------------
 
 // Indicating current state
-assign s_RESET        = (sdram_state == RESET);
-assign s_INIT         = (sdram_state == INIT);
-assign s_IDLE         = (sdram_state == IDLE);
-assign s_ROW_ACTIVE   = (sdram_state == ROW_ACTIVE);
-assign s_WRITE        = (sdram_state == WRITE);
-assign s_READ         = (sdram_state == READ);
-assign s_PRECHARGE    = (sdram_state == PRECHARGE);
-assign s_AUTO_REFRESH = (sdram_state == AUTO_REFRESH);
-
-// state transaction arc
-
-assign arc_RESET_to_INIT = s_RESET;
-
-assign arc_INIT_to_IDLE = s_INIT & init_done;
-
-assign arc_IDLE_to_ROW_ACTIVE = s_IDLE & ~ref_req & int_req     & bank_precharged;
-assign arc_IDLE_to_WRITE      = s_IDLE & ~ref_req & req_write_q & ~open_new_row;
-assign arc_IDLE_to_READ       = s_IDLE & ~ref_req & req_read_q  & ~open_new_row;
-assign arc_IDLE_to_PRECHARGE  = s_IDLE & (ref_req | int_req     & open_new_row);
-
-assign arc_ROW_ACTIVE_to_WRITE = s_ROW_ACTIVE & cmd_done & req_write_q;
-assign arc_ROW_ACTIVE_to_READ  = s_ROW_ACTIVE & cmd_done & req_read_q;
-
-assign arc_WRITE_to_IDLE      = s_WRITE & cmd_done & ~ref_req & ~int_req;
-assign arc_WRITE_to_WRITE     = s_WRITE & cmd_done & ~ref_req & req_write_q & ~open_new_row;
-assign arc_WRITE_to_READ      = s_WRITE & cmd_done & ~ref_req & req_read_q  & ~open_new_row;
-assign arc_WRITE_to_PRECHARGE = s_WRITE & cmd_done & (ref_req | int_req     & open_new_row);
-
-assign arc_READ_to_IDLE = s_READ & cmd_done;
-
-assign arc_PRECHARGE_to_AUTO_REFRESH = s_PRECHARGE & cmd_done & ref_req;
-assign arc_PRECHARGE_to_ROW_ACTIVE   = s_PRECHARGE & cmd_done & ~ref_req;
-
-assign arc_AUTO_REFRESH_to_IDLE       = s_AUTO_REFRESH & cmd_done & ~int_req;
-assign arc_AUTO_REFRESH_to_ROW_ACTIVE = s_AUTO_REFRESH & cmd_done & int_req;
+assign s_INIT    = (sdram_state == INIT);
+assign s_ACCESS  = (sdram_state == ACCESS);
+assign s_REFRESH = (sdram_state == REFRESH);
 
 // state transition
 always_ff @(posedge clk) begin
@@ -260,90 +202,101 @@ always_ff @(posedge clk) begin
     end
 end
 
-assign to_IDLE = arc_INIT_to_IDLE | arc_WRITE_to_IDLE | arc_READ_to_IDLE | arc_AUTO_REFRESH_to_IDLE;
-assign to_ROW_ACTIVE = arc_IDLE_to_ROW_ACTIVE | arc_PRECHARGE_to_ROW_ACTIVE | arc_AUTO_REFRESH_to_ROW_ACTIVE;
-assign to_READ = arc_IDLE_to_READ | arc_ROW_ACTIVE_to_READ | arc_WRITE_to_READ;
-assign to_WRITE = arc_IDLE_to_WRITE | arc_ROW_ACTIVE_to_WRITE | arc_WRITE_to_WRITE;
-assign to_PRECHARGE = arc_IDLE_to_PRECHARGE | arc_WRITE_to_PRECHARGE;
-assign to_REFRESH = arc_PRECHARGE_to_AUTO_REFRESH;
-
 always_comb begin
-    case (1)
-        arc_RESET_to_INIT:  sdram_state_next = INIT;
-        to_IDLE:            sdram_state_next = IDLE;
-        to_ROW_ACTIVE:      sdram_state_next = ROW_ACTIVE;
-        to_READ:            sdram_state_next = READ;
-        to_WRITE:           sdram_state_next = WRITE;
-        to_PRECHARGE:       sdram_state_next = PRECHARGE;
-        to_REFRESH:         sdram_state_next = AUTO_REFRESH;
-        default:            sdram_state_next = sdram_state;
+    sdram_state_next = sdram_state;
+    case(sdram_state)
+        RESET: sdram_state_next = INIT;
+        INIT: if (init_done) sdram_state_next = ACCESS;
+        ACCESS: if (access_done && ref_req) sdram_state_next = REFRESH;
+        REFRESH: if (refresh_done) sdram_state_next = ACCESS;
+        default: sdram_state_next = sdram_state;
     endcase
 end
-
-// ----------------------------------------------
-// Refresh counter
-// ----------------------------------------------
-always_ff @(posedge clk) begin
-    if (!rst_n) begin
-        ref_cnt <= 'b0;
-    end
-    else begin
-        if (arc_INIT_to_IDLE || arc_PRECHARGE_to_AUTO_REFRESH) ref_cnt <= REFRESH_INTERVAL;
-        else if (ref_cnt > 0) ref_cnt <= ref_cnt - 1'b1;
-    end
-end
-
-assign ref_req = ref_cnt == 0;
 
 // ----------------------------------------------
 // CAS Latency counter
 // ----------------------------------------------
 // In order to support pipelined read, use a shift register to generate desired delay
+// Currently it takes CL + 2 cycle for the read data to appear on the response bus (rsp_*) after
+// the read request is issued from sdram_ctrl module.
+// The additional 2 cycle besides CL comes from the following:
+//     - 1 cycle for the sdram_cmd module to register the internal request to the SDRAM interface
+//     - 1 cycle for the sdram controller to receives the data from the SDRAM interface
 
-assign cmd_is_read = cmd_valid & (cmd_type == `CMD_READ);
+assign read_req_send = grant_read;
 
 always_ff @(posedge clk) begin
     if (!rst_n) begin
         read_valid_pipe <= 'b0;
     end
     else begin
-        read_valid_pipe <= {read_valid_pipe[RD_SF_WIDTH-2:0], cmd_is_read};
+        read_valid_pipe <= {read_valid_pipe[RD_SF_WIDTH-2:0], read_req_send};
     end
 end
 
+always_ff @(posedge clk) begin
+   rsp_rdata <= sdram_dq_in;
+end
+
+assign rsp_early_valid = cfg_cas_latency == 2 ? read_valid_pipe[RD_SF_WIDTH-3] : read_valid_pipe[RD_SF_WIDTH-2];
+assign rsp_valid       = cfg_cas_latency == 2 ? read_valid_pipe[RD_SF_WIDTH-2] : read_valid_pipe[RD_SF_WIDTH-1];
+
 // ----------------------------------------------
-// SDRAM bank/row status
+// SDRAM status
 // ----------------------------------------------
 
-assign row_active_done = s_ROW_ACTIVE & cmd_done;
-assign precharge_done  = s_PRECHARGE  & cmd_done;
+// 1. Precharge and Active status
+
+assign precharge_done  = grant_precharge & cmd_done;
+assign row_active_done = grant_active    & cmd_done;
 
 always_ff @(posedge clk) begin
     if (!rst_n) begin
-        bank_precharged <= 1'b1;
+        row_activated <= 1'b0;
     end
     else begin
-        if      (precharge_done)  bank_precharged <= 1'b1;
-        else if (row_active_done) bank_precharged <= 1'b0;
+        if      (precharge_done)  row_activated <= 1'b0;
+        else if (row_active_done) row_activated <= 1'b1;
     end
 end
 
+assign precharged = ~row_activated;
+
 always_ff @(posedge clk) begin
-    if (row_active_done) active_ba_row <= {bank, row};
+    if (row_active_done) activated_bank_row <= {bank, row};
 end
 
+assign request_bank_row = {bank, row};
+
 // open a new row when
-// - bank is precharged so no bank/row is active
+// - row is not activated (precharged)
 // - the next request target a different bank/row
-assign open_new_row = bank_precharged | (next_ba_row != active_ba_row);
-assign next_ba_row = {bank, row};
+assign open_new_row = precharged | (request_bank_row != activated_bank_row);
+
+// 2. Refresh status
+
+always_ff @(posedge clk) begin
+    if (!rst_n) begin
+        ref_cnt <= 'b0;
+    end
+    else begin
+        if (s_INIT || grant_refresh && cmd_done) ref_cnt <= REFRESH_INTERVAL;
+        else if (ref_cnt > 0) ref_cnt <= ref_cnt - 1'b1;
+    end
+end
+
+assign ref_req = ref_cnt == 0;
+
+// 3. SDRAM request status
+
+assign req_done = grant_write | grant_read; // read/write only takes 1 cycle so grant means command is send and complete
+assign req_ready = init_done_q & (~req_valid_q | req_done);
 
 // ----------------------------------------------
 // SDRAM State Machine Output Function Logic
 // ----------------------------------------------
 
 assign req_act = req_valid & req_ready;
-assign int_req = req_read_q | req_write_q;
 
 // Decode the address to sdram bank, row, col
 assign {bank, row, col} = req_addr_q[AW-1:BW];
@@ -361,72 +314,129 @@ else begin
 end
 endgenerate
 
+always_ff @(posedge clk) begin
+    if (!rst_n) init_done_q <= 1'b0;
+    else init_done_q <= init_done;
+end
+
+/**
+
+Implementation Note:
+
+There are two type of requests: sdram access and sdram refresh. They are mapped to several SDRAM commands, including:
+Precharge, Active, Read or Write, and Refresh.
+
+Depending on the status and the request, it may requires one or more of the above command to be performed.
+Each command will assert corresponding signal, and an arbiter will grant the command in the following order:
+Precharge -> Active or Refresh -> Read or Write
+
+For example, a sdram refresh request will always assert precharge and refresh signal. The arbiter will grant precharge first.
+Once precharge cmd is completed, precharge signal is de-asserted and refresh cmd is granted and performed.
+Once refresh cmd is completed, then the sdram refresh request is completed.
+
+Another example, a sdram access request targeting a different row from the currently opened row.
+This request will assert precharge, row active, and write signal. Precharge is first granted, followed by row active cmd
+and finally write cmd.
+
+The sdram access request comes in order so that sequences of sdram command to be performed is also in order.
+The sdram refresh request could come anytime and it come when a sdram access request is performed. For non-burst mode.
+We wait for the current sdram access request to complete before starting process the refresh request.
+
+To accommodate this, two separate state is used: ACCESS and REFRESH state.
+
+**/
+
+// precharge is performed when a row is currently activated and need to open a new row
+assign access_precharge = s_ACCESS & row_activated & req_valid_q & open_new_row;
+
+// row active is performed when there are request pending and row is not activated (usually after a precharge command)
+assign access_active = s_ACCESS & precharged & req_valid_q;
+
+// write is performed when there are write request pending and row is activated
+assign access_write = s_ACCESS & row_activated & req_valid_q & req_write_q;
+
+// read is performed when there are read request pending and row is activated
+assign access_read = s_ACCESS & row_activated & req_valid_q & ~req_write_q;
+
+// precharge is performed when sdram need refresh
+assign refresh_precharge = s_REFRESH & row_activated;
+
+// refresh is performed after precharge complete
+assign refresh_refresh = s_REFRESH & precharged;
+
+// Main control logic
 always_comb begin
 
     // assign default value to most used value so we don't have to assign them again in the case statement
     cmd_valid = 1'b0;
-    cmd_type = `CMD_NOP;
-    cmd_ba   = bank;
-    cmd_data = req_wdata_q;
-    cmd_dqm = ~req_byteenable_q;
-    cmd_addr = {addr_col[RAW-1:11], 1'b0, addr_col[9:0]};
-    req_done = 1'b0;
+    cmd_type  = `CMD_NOP;
+    cmd_ba    = 'b0;
+    cmd_data  = 'b0;
+    cmd_dqm   = 'b0;
+    cmd_addr  = 'b0;
 
-    // use the next state here
-    case(sdram_state_next)
-        IDLE: begin
-            cmd_valid = 1'b0;
-        end
-        ROW_ACTIVE: begin
-            cmd_valid = ~cmd_wip;
-            cmd_type = `CMD_ACTIVE;
-            cmd_addr = row;
-        end
-        WRITE: begin
-            cmd_valid = ~cmd_wip;
-            cmd_type = `CMD_WRITE;
-            // For pipelined design, write cmd is considered completed 1 cycle before the write request is presented
-            // in the SDRAM interface which is when cmd_done asserted. One special case is the before entering the
-            // write state, the cmd is considered done for the first write request
-            req_done = cmd_done | (sdram_state_next != WRITE);
-        end
-        READ: begin
-            cmd_valid = ~cmd_wip;
-            cmd_type = `CMD_READ;
-            req_done = cmd_done;
-        end
-        PRECHARGE: begin
-            cmd_valid = ~cmd_wip;
-            cmd_type = `CMD_PRECHARGE;
-            cmd_addr[10] = 1'b1;
-        end
-        AUTO_REFRESH: begin
-            cmd_valid = ~cmd_wip;
-            cmd_type = `CMD_REFRESH;
-        end
-    endcase
+    grant_precharge = 1'b0;
+    grant_refresh   = 1'b0;
+    grant_active    = 1'b0;
+    grant_write     = 1'b0;
+    grant_read      = 1'b0;
 
+    // command arbitration
+    if (access_precharge || refresh_precharge) begin
+        grant_precharge = 1'b1;
+        cmd_valid = cmd_ready & precharge_ready;
+        cmd_type = `CMD_PRECHARGE;
+        cmd_addr[10] = 1'b1;
+    end
+    else if (refresh_refresh) begin
+        grant_refresh = 1'b1;
+        cmd_valid = cmd_ready ;
+        cmd_type = `CMD_REFRESH;
+    end
+    else if (access_active) begin
+        grant_active = 1'b1;
+        cmd_valid = cmd_ready & active_ready;
+        cmd_type = `CMD_ACTIVE;
+        cmd_ba   = bank;
+        cmd_addr = row;
+    end
+    else if (access_write) begin
+        grant_write = 1'b1;
+        cmd_valid = cmd_ready & write_ready;
+        cmd_type  = `CMD_WRITE;
+        cmd_ba    = bank;
+        cmd_data  = req_wdata_q;
+        cmd_dqm   = ~req_byteenable_q;
+        cmd_addr  = {addr_col[RAW-1:11], 1'b0, addr_col[9:0]};
+    end
+    else if (access_read) begin
+        grant_read = 1'b1;
+        cmd_valid = cmd_ready;
+        cmd_type  = `CMD_READ;
+        cmd_ba    = bank;
+        cmd_dqm   = ~req_byteenable_q;
+        cmd_addr  = {addr_col[RAW-1:11], 1'b0, addr_col[9:0]};
+    end
 end
+
+assign access_done = precharge_ready; // precharge ready means the current sdram request has been completed.
+assign refresh_done = refresh_refresh & cmd_done;
 
 /////////////////////////////////////////////////
 // SIMULATION
 /////////////////////////////////////////////////
 
 `ifdef SIMULATION
-// Showing state in STRING
-logic [95:0] sdram_state_str;
+
+logic [95:0] sdram_operation_string;
 always_comb begin
-    case (sdram_state)
-        RESET:        sdram_state_str = "RESET     ";
-        INIT:         sdram_state_str = "INIT      ";
-        MODE_REG_SET: sdram_state_str = "MODE_REG  ";
-        IDLE:         sdram_state_str = "IDLE      ";
-        ROW_ACTIVE:   sdram_state_str = "ROW_ACTIVE";
-        WRITE:        sdram_state_str = "WRITE     ";
-        READ:         sdram_state_str = "READ      ";
-        PRECHARGE:    sdram_state_str = "PRECHARGE ";
-        AUTO_REFRESH: sdram_state_str = "AUTO_REFRESH";
-        default:      sdram_state_str = "UNKNOWN   ";
+    case (1)
+        grant_precharge: sdram_operation_string = "PRECHARGE";
+        grant_refresh:   sdram_operation_string = "AUTO_REFRESH";
+        grant_active:    sdram_operation_string = "ROW_ACTIVE";
+        grant_write:     sdram_operation_string = "WRITE";
+        grant_read:      sdram_operation_string = "READ";
+        default:         sdram_operation_string = "IDLE";
     endcase
 end
 
