@@ -15,17 +15,15 @@ VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_controller.sv
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_init.sv
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_cmd.sv
 VERILOG += $(GIT_ROOT)/rtl/sdram/sdram_ctrl.sv
-VERILOG += $(GIT_ROOT)/rtl/wbsdram/wbsdram.sv
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_25.v
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_50.v
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_100.v
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_130.v
 VERILOG += $(GIT_ROOT)/rtl/fpga_examples/pll/altpll_top.v
-VERILOG += $(GIT_ROOT)/rtl/fpga_examples/vjtag2sdram/fpga_vjtag2sdram.sv
-VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag_ctrl.sv
-VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag_ip.v
-VERILOG += $(GIT_ROOT)/ip/Altera-VJTAG-Host/rtl/vjtag/vjtag2wb.sv
-VERILOG += $(GIT_ROOT)/fpga/de2/top.sv
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/sdram_test/sdram_test.sv
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/sdram_test/sdram_driver.sv
+VERILOG += $(GIT_ROOT)/rtl/fpga_examples/sdram_test/fpga_sdram_test.sv
+VERILOG += $(GIT_ROOT)/fpga/de2_sdram_test/top.sv
 # verilog include directory
 SEARCH += $(GIT_ROOT)/rtl/sdram
 # verilog define

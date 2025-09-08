@@ -1,0 +1,35 @@
+[*]
+[*] GTKWave Analyzer v3.3.104 (w)1999-2020 BSI
+[*] Sun Sep  7 19:02:26 2025
+[*]
+[dumpfile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/sdram_test/sim_build/tb_sdram_test.fst"
+[dumpfile_mtime] "Sun Sep  7 19:01:48 2025"
+[dumpfile_size] 194279
+[savefile] "/home/feipenghhq/Desktop/IP/SDRAM_controller/sim/cocotb/tests/sdram_test/waveform.gtkw"
+[timestart] 141599500
+[size] 1683 1240
+[pos] -1 -1
+*-16.000000 141729500 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[treeopen] tb_sdram_test.
+[treeopen] tb_sdram_test.dut.
+[sst_width] 339
+[signals_width] 381
+[sst_expanded] 1
+[sst_vpaned_height] 367
+@28
+tb_sdram_test.dut.u_sdram_driver.clk
+@24
+tb_sdram_test.dut.u_sdram_driver.state[1:0]
+@25
+tb_sdram_test.dut.u_sdram_driver.state_next[1:0]
+@28
+tb_sdram_test.dut.u_sdram_driver.req_valid
+tb_sdram_test.dut.u_sdram_driver.req_write
+tb_sdram_test.dut.u_sdram_driver.req_fire
+@22
+tb_sdram_test.dut.u_sdram_driver.req_addr[23:0]
+@28
+tb_sdram_test.dut.u_sdram_driver.last_addr
+tb_sdram_test.dut.u_sdram_driver.complete
+[pattern_trace] 1
+[pattern_trace] 0
